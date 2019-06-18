@@ -1,0 +1,156 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+. $DIR/bin/tool
+
+function prepare_portal
+{
+     _banner_index "Prepare Portal Node[0/1]"
+     ZABBIX_SERVER=$(crudini --get $DIR/config/Common.conf ZABBIX ZABBIX_HOST_IP)
+     ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/prepare_portal.yaml --extra-vars "DIR=$DIR WORSPACE=$default_workspace NTP_SERVER=$NTP_SERVER ZABBIX_SERVER=$ZABBIX_SERVER"
+     if [[ $? -eq 0 ]]
+     then
+          EXECUTE_NEXT_STEP_FLAG=0
+     else
+          EXECUTE_NEXT_STEP_FLAG=1
+     fi
+}
+
+function install_poratl
+{
+    _banner_index "Depoly App Into Portal Node[1/1]"
+    MODULE_LIST=$(crudini --get $DIR/config/Common.conf PORTAL | grep _IP)
+    #MODULE_LIST=$(crudini --get $DIR/config/Common.conf PORTAL | grep _ip)
+    #echo "***********************"$MODULE_LIST
+    for MODULE in $MODULE_LIST
+    do
+         #APP_TYPE=$(echo $MODULE| awk -F "_" {'print $2'})
+         APP_TYPE=${MODULE%_IP}
+         #ansible -i hosts/deploy_target_hosts $MODULE -a "sh /opt/deploy/bin/run_portal $APP_TYPE "
+         echo "Current is : "$APP_TYPE
+        # ansible -i $DIR/hosts/deploy_target_hosts $MODULE -b  -a "sh $default_workspace/bin/run_portal $APP_TYPE "
+         if [[ $? -eq 0 ]]
+         then
+              EXECUTE_NEXT_STEP_FLAG=0
+              # Update Flag
+              crudini --set $DIR/config/Common.conf PORTAL PORTAL_ACTION None
+              _log_succ "Depoly $APP_TYPE :[SUCCESS]"
+         else
+              EXECUTE_NEXT_STEP_FLAG=1
+              _log_succ "Depoly $APP_TYPE :[FAIL]"
+         fi
+    done
+}
+
+function install_paas_portal
+{
+    _banner_index "Depoly Bocloud Paas service[1/1]"
+    for MODULE in $(crudini --get $DIR/config/Common.conf PORTAL | grep _IP);do
+        #Role=$(echo $MODULE| awk -F "_" {'print $2'})
+        Role=${MODULE%_IP}
+        echo "Current is : $Role"
+        paas_gateway="["
+        serialnum=1
+        for hx in ${GATEWAY_HOST//,/ };do
+          paas_gateway=$paas_gateway"{'name':'gw$serialnum','ip':$hx},"
+          let serialnum=serialnum+1
+        done
+        paas_gateway=$paas_gateway"]"
+        
+        isHA=$(echo ${DB_HOST//,/\ }|wc -w)
+        [[ $isHA > 2 ]] && DB_HOST=$HA_LB_VIP
+        echo "ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/portal.yml --tags=$Role -e "'paas_gateways':$paas_gateway" \
+            --extra-vars=\"DEFAULT_WORKSPACE=$default_workspace HTTP_SERVER=$LOCAL_IP CONSUL_HOST=$CONSUL_HOST CONSUL_PORT=$CONSUL_PORT CONSUL_TOKEN=$CONSUL_TOKEN RELEASE_TAGS=$RELEASE_TAGS \
+            DB_HOST=$DB_HOST SQL_PORT=$SQL_PORT SQL_USER=$SQL_USER SQL_PASS=$DB_PASS GATEWAY_HOST=$GATEWAY_HOST GATEWAY_PORT=$GATEWAY_PORT\""
+        #ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/uboc.yml  --tags=nfs_client -e "consul_acl_master_token=$CONSUL_TOKEN consul_node_role=client STOR_HOST_IP=$STOR_HOST_IP"
+        #if [[ $? -eq 0 ]];then
+        #    _log_succ "Depoly NFS CLIENT :[SUCCESS]"
+        #else
+        #    EXECUTE_NEXT_STEP_FLAG=1
+        #    _log_err "Depoly NFS CLIENT :[FAIL]"
+        #   exit 1
+        #fi
+        ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/portal.yml --tags=$Role -e "{'paas_gateways':$paas_gateway}" \
+            --extra-vars="DEFAULT_WORKSPACE=$default_workspace HTTP_SERVER=$LOCAL_IP CONSUL_HOST=$CONSUL_HOST CONSUL_PORT=$CONSUL_PORT CONSUL_TOKEN=$CONSUL_TOKEN RELEASE_TAGS=$RELEASE_TAGS \
+            DB_HOST=$DB_HOST SQL_PORT=$SQL_PORT SQL_USER=$SQL_USER SQL_PASS=$DB_PASS GATEWAY_HOST=$GATEWAY_HOST GATEWAY_PORT=$GATEWAY_PORT"
+        if [[ $? -eq 0 ]];then
+            EXECUTE_NEXT_STEP_FLAG=0
+            _log_succ "Depoly $Role :[SUCCESS]"
+        else
+            EXECUTE_NEXT_STEP_FLAG=1
+            _log_err "Depoly $Role :[FAIL]"
+        fi
+#        case $Role in
+#            paas_application)
+#                ansible-playbook -i $DIR/hosts/deploy_target_hosts $DIR/yamls/uboc.yml --tags= \
+#                    --extra-vars="DEFAULT_WORKSPACE=$default_workspace MQ_IP=$MQ_HOST MQ_PORT=${MQ_PORT:-5672} MQ_USER=$MQ_USER MQ_PASS=$MQ_PASS"
+#                if [[ $? -eq 0 ]];then
+#                    crudini --set $CONFIG_FILE MQ MQ_RE_INSTALL False
+#                    EXECUTE_NEXT_STEP_FLAG=0
+#                else
+#                    EXECUTE_NEXT_STEP_FLAG=1
+#                fi
+#                ;;
+#            ) 
+#                ;;
+#           *) 
+#                echo "Error!!!! $Role Unknown"
+#                ;;
+#        esac
+    done
+    if [ $EXECUTE_NEXT_STEP_FLAG = 0 ];then 
+         crudini --set $DIR/config/Common.conf PORTAL PORTAL_ACTION None
+    fi
+}
+
+function upgrade_portal
+{
+     _banner_index "******Upgrade App Of Portal Node******"
+
+     # agri-workflow
+     # Update System Registry
+     # Stop & Clean Running Container Instance
+     # Clean Local Images
+     # Re-Run Container Instance Using The Latest Images
+
+}
+
+
+function common_install_portal_action
+{
+    PORTAL_ACTION_FLAG=$(crudini --get $DIR/config/Common.conf PORTAL PORTAL_ACTION)
+    if [[ "$PORTAL_ACTION_FLAG" == "Install" || "$PORTAL_ACTION_FLAG" == "install" ]]
+    then
+         #prepare_portal
+         if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+         then
+              #install_poratl
+              install_paas_portal
+         else
+              exit 1
+         fi
+    elif [[ "$PORTAL_ACTION_FLAG" == "Upgrade" || "$PORTAL_ACTION_FLAG" == "upgrade" ]]
+    then
+         #prepare_portal
+         if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+         then
+              #install_poratl
+              install_paas_portal
+         else
+              exit 1
+         fi
+
+    elif [[ "$PORTAL_ACTION_FLAG" == "None" || "$PORTAL_ACTION_FLAG" == "none" ]]
+    then
+         _log_info "Skip......."
+    else
+         _log_warn "Wrong "
+    fi
+}

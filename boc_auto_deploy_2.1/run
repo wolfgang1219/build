@@ -1,0 +1,215 @@
+#!/bin/bash
+
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+DRIVER_OS_VERSION=$(cat  /etc/redhat-release | awk -F " " {'print $4'})
+
+DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+EXECUTE_NEXT_STEP_FLAG=0
+
+. $DIR/bin/logs
+#. $DIR/bin/base_driver_initial
+. $DIR/bin/base_common_config
+. $DIR/bin/common_initial_ansible
+. $DIR/bin/common_generate_target_ips
+
+
+#. $DIR/bin/common_install_pipeline
+
+#Here Need Add Copyright
+
+_banner "Preare Basic Testing Driver [****** [0/17] ******]"
+#Prepare
+base_commone_clean_action
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Generate Related Target IPs [***** [1/17] *****]"
+    #IP Ready
+    common_generate_target_ips_action
+else
+    exit 1
+fi
+#echo $EXECUTE_NEXT_STEP_FLAG
+#exit 0
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Initial Basic Ansible Driver [***** [2/17] *****]"
+   #Initial Ansible
+   common_initial_ansible_action
+else
+    exit 1
+fi
+
+echo $EXECUTE_NEXT_STEP_FLAG
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Prepare Basic Config Driver [***** [3/17] *****]"
+    #Base Config
+    base_common_config_action
+else 
+    exit 1
+fi
+#exit 0
+. $DIR/bin/base_driver_initial
+base_driver_initial_action
+#if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+#then
+#    _banner "Initial Basic Ansible Driver [***** [3/11] *****]"
+#   #Initial Ansible
+#   common_initial_ansible_action
+#else
+#    exit 1
+#fi
+
+#if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+#then
+#    _banner "Generate Related Target IPs [***** [4/15] *****]"
+#    #IP Ready
+#    common_generate_target_ips_action
+#else
+#    exit 1
+#fi
+#exit 0
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Initial Basic Distribution  [***** [5/17] *****]"
+    
+    . $DIR/bin/common_initial_registry
+    #Registry Ready
+    common_initial_registry_action
+else
+    exit 1
+fi
+
+#if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+#then
+#    _banner "Support Moudule:  Zookeeper [***** [6/11] *****]"
+#    . $DIR/bin/common_initial_zookeeper
+#    common_initial_zookeeper_action
+#else
+#    exit 1
+#fi
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  HA LoadBalance [******[6/17] *****]"
+    . $DIR/bin/deploy_lb
+    deploy_lb
+else
+    exit 1
+fi
+#exit 0
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  RabbitMQ [***** [7/17] *****]"
+    . $DIR/bin/deploy_mq
+    deploy_mq
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  Redis [***** [8/17] *****]"
+    . $DIR/bin/deploy_redis
+    deploy_redis
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  Consul [***** [9/17] *****]"
+    . $DIR/bin/deploy_consul
+    deploy_consul
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  PipeLine [***** [10/17] *****]"
+    . $DIR/bin/common_install_pipeline
+    common_install_pipeline_action
+else
+    exit 1
+fi
+
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Install & Initial Basic Mariadb As Default Database  [***** [11/17] *****]"
+    . $DIR/bin/common_initial_database
+    common_initial_database_action
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  Gateway [***** [12/17] *****]"
+    . $DIR/bin/deploy_gateway
+    deploy_gateway
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  Worker [***** [13/17] *****]"
+    . $DIR/bin/deploy_worker
+    deploy_worker
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  Artifactory [***** [14/17] *****]"
+    . $DIR/bin/deploy_artifactory
+    deploy_artifactory
+else
+    exit 1
+fi
+
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Support Moudule:  XXL-JOB [***** [15/17] *****]"
+    . $DIR/bin/deploy_xxljob
+    deploy_xxljob
+else
+    exit 1
+fi
+
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+
+    _banner "Deploy Basic Portal Application [***** [16/17] *****]"
+    . $DIR/bin/common_install_portal
+    #Deploy Portal
+    common_install_portal_action
+else
+    exit 1
+fi
+
+#Here Need Clean UP Action
+if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+then
+    _banner "Restore & Clean Up Basic TestBed [***** [17/17] *****]"
+#    base_commone_clean_action
+#    http_server_clean
+else
+    exit 1
+fi
+

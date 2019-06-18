@@ -1,0 +1,33 @@
+#!/bin/bash
+container_svr_name="redis"
+
+redis_ips={{REDIS_IP}}
+local_ip={{host_var_ip}}
+
+CONTAINER_NAME=$(docker ps --all -f name=${container_svr_name} -q)
+for c in $CONTAINER_NAME;do
+  docker stop $c && docker rm $c
+done
+
+docker run -d --name redis1 --restart=always \
+           -v /opt/redis-cluster/7061/data:/data \
+           -v /opt/redis-cluster/7061/conf/redis-7061.conf:/usr/local/etc/redis/redis.conf \
+           --net=host --privileged=true deploy.bocloud/paas/redis:5.0.0 \
+           redis-server /usr/local/etc/redis/redis.conf
+sleep 5
+docker run --net=host --restart=always  -v /opt/redis-cluster/7062/data:/data -v /opt/redis-cluster/7062/conf/redis-7062.conf:/usr/local/etc/redis/redis.conf --privileged=true --name redis2 -d deploy.bocloud/paas/redis:5.0.0 redis-server /usr/local/etc/redis/redis.conf
+
+sleep 5
+
+docker run --net=host --restart=always  -v /opt/redis-cluster/7063/data:/data -v /opt/redis-cluster/7063/conf/redis-7063.conf:/usr/local/etc/redis/redis.conf --privileged=true --name redis3 -d deploy.bocloud/paas/redis:5.0.0 redis-server /usr/local/etc/redis/redis.conf
+
+sleep 5
+svr_runing=$(docker ps -a | grep "${container_svr_name}" | egrep "Up [About]|[0-9]{1,}")
+if [[ ${svr_runing} == "" ]];
+then
+    echo -e "\nError: docker-redis failed to start...\n"
+    exit 1
+fi
+echo -e "\nOK: docker-redis has started as background server.\n"
+exit 0
+

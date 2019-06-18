@@ -1,0 +1,46 @@
+server_port: 9004
+data_prefix: nacha_runtime
+xxljob_logretentiondays: 3
+maximum_pool_size: 15
+idle_timeout: 30000
+max_lifetime: 1800000
+connection_timeout: 30000
+data_minIdle: 5
+systemconfig:
+  kubeMasterDns: master.dns
+  pipelineHostIp: {{PIPE_LINE_IP}}
+  pipelineHostUser: {{CI_HOST_USER}}
+  pipelineHostPwd: {{CI_HOST_PASS}}
+  imageCopyThreads: 5
+  abcsys_service_version: 1.8
+  max_fails: 1
+  fail_timeout: 10s
+  proxy_connect_timeout: 60s
+  proxy_read_timeout: 60s
+  proxy_send_timeout: 60s
+  certificationPath: /abcs/pki
+  certificationUrl: :9000/abcsys/1.6/_getFile_
+  imageCopyCron: 0 0/5 * * * ?
+  registryUpdateCron: 0 0/5 * * * ?
+  clusterHealthCron: 0/30 * * * * ?
+  monitorHostCron: 0/2 * * * * ?
+  hostProcessCron: 0/30 * * * * ?
+  httpTimeOut: 1800000
+  clusterCpuThreshold: 0.9
+  clusterMemThreshold: 0.9
+  clusterStorageThreshold: 0.9
+  evnCpuThreshold: 0.9
+  evnMemThreshold: 0.9
+  evnStorageThreshold: 0.9
+  podDrainInterval: 1
+  podDrainTimeOut: 20
+  serviceapplication: http://paas-application/
+  servicedeployer: http://paas-deployer/
+  monitordeployer: http://paas-monitor/
+  servicelogger: http://paas-generalpurpose/
+  serviceruntime: http://paas-runtime/
+  serviceappstore: http://paas-appstore/
+  servicepipeline: http://paas-basic-pipeline/
+  serviceuser: http://paas-basic-upms/
+  smtpusername: [smtpusername]
+  smtppassword: [smtppassword]

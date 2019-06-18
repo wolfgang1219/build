@@ -1,0 +1,23 @@
+#!/bin/bash
+base_name="paas-basic-gateway"
+container_svr_name="${base_name}-$(hostname -s)"
+
+CONTAINER_NAME=$(docker ps --all -f name=${container_svr_name} -q)
+if [ "$CONTAINER_NAME" != "" ];then
+    docker stop $CONTAINER_NAME
+    docker rm $CONTAINER_NAME
+fi
+#consul_host={{CONSUL_HOST}} 
+consul_host={{ ansible_default_ipv4.address }}
+docker run -d --name ${container_svr_name} --restart=always -v /abcsys/upload/:/abcsys/upload/ \
+           -e consul_host=$consul_host -e consul_port={{CONSUL_PORT}} -e acl_token={{CONSUL_TOKEN}} \
+           --net=host deploy.bocloud/paas/${base_name}:{{RELEASE_TAGS}}
+
+sleep 5
+
+svr_runing=$(docker ps -a | grep "${container_svr_name}" | egrep "Up [About]|[0-9]{1,}")
+if [[ ${svr_runing} == "" ]];
+then
+    echo -e "\nError: ${container_svr_name} failed to start...\n"
+    exit 1
+fi

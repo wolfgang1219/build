@@ -1,0 +1,38 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: wuheng@{otcaix.iscas.ac.cn, beyondcent.com}
+## Date  : 2017/8/10
+##
+#####################################################
+
+# Check 
+pipe=$(rpm -qa | grep devops-pipe | grep -v grep)
+
+if [[ -z $pipe ]]
+then
+    echo "You have not installed devops-pipe"
+    exit 0
+fi
+
+source /etc/profile
+echo "Start clair"
+docker-compose -f /var/local/docker-image-security-scanner-master/clair/docker-compose.yml up -d
+echo "Start Sonar"
+bash /abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh start
+echo "Start Jenkins"
+bash /abcs/jenkins-2.46.3/bin/startup.sh
+echo "Jenkins Url: http://jenkins-server:8080/jenkins, (admin/admin)"
+echo "Jenkins log: /abcs/jenkins-2.46.3/logs/catalina.out"
+echo "Sonar Url: http://sonar-server:9000/jenkins, (admin/admin)"
+echo "Sonar log: /abcs/sonarqube-6.3.1/logs/sonar.log"
+
+chmod 777 /etc/rc.d/rc.local
+sed -i '/profile/d' /etc/rc.d/rc.local
+sed -i '/sonarqube-6.3.1/d' /etc/rc.d/rc.local
+sed -i '/jenkins-2.46.3/d' /etc/rc.d/rc.local
+echo "source /etc/profile" >> /etc/rc.d/rc.local
+echo "bash /abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh start" >> /etc/rc.d/rc.local
+echo "bash /abcs/jenkins-2.46.3/bin/startup.sh" >> /etc/rc.d/rc.local

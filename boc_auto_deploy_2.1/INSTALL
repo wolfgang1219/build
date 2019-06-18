@@ -1,0 +1,14 @@
+#!/bin/bash
+
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+sh $DIR/run | tee install_`date "+%Y-%m-%d-%H-%M-%S"`.log

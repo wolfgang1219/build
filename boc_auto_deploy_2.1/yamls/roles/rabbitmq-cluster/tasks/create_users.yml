@@ -1,0 +1,24 @@
+---
+# rc 70: user already exists
+- name: create test user
+  shell: rabbitmqctl add_user {{MQ_USER}} {{MQ_PASS}}
+  register: res
+  failed_when: res.rc != 70 and res.rc != 0
+  changed_when: res.rc != 70
+
+- name: list permissions for test user
+  shell: rabbitmqctl list_permissions
+  register: list_permissions
+  changed_when: false
+
+- name: set permissions on / vhost
+  shell: rabbitmqctl set_permissions {{MQ_USER}} ".*" ".*" ".*"
+  when: list_permissions.stdout.find(MQ_USER) == -1
+
+- name: tag admin
+  shell: rabbitmqctl set_user_tags {{MQ_USER}} administrator
+  when: list_permissions.stdout.find(MQ_USER) == -1
+
+- name: delete guest
+  shell: rabbitmqctl delete_user guest
+  ignore_errors: true

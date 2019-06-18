@@ -1,0 +1,17 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: wuheng@{otcaix.iscas.ac.cn, beyondcent.com}
+## Date  : 2017/5/28
+##
+#####################################################
+
+sed -i '/'"$2"'/d' /etc/hosts
+echo "$1" $2 >> /etc/hosts
+
+echo { \
+                \"status\": \"200\" \
+        }
+

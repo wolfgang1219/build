@@ -1,0 +1,176 @@
+- hosts: REGISTRY
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Install Base NFS 
+      yum: name=nfs-utils state=latest
+
+    - name: Install NTP Server(0)    
+      yum: name=ntp state=latest
+
+    - name: Enable NTP Service(1)
+      service: name=ntpd enabled=yes state=started  
+
+    - name: Update The NTP Configure(2)
+      lineinfile:  dest=/etc/ntp.conf  regexp='^server.*'  state=absent
+    
+    - name: Update The NTP Configur (3)
+      lineinfile:  dest=/etc/ntp.conf  line="server {{ E_NTP_SERVER }}" state=present
+      when: E_NTP_SERVER != ""
+     
+    - name: Update The NTP Configure(4)
+      lineinfile: dest=/etc/ntp.conf line="server  127.127.1.0" 
+      #when: 
+
+    - name: Update The NTP Configure(5)
+      lineinfile: dest=/etc/ntp.conf line="fudge   127.127.1.0 stratum 10"
+      #when:
+
+    - name: Start NTP Service(4)
+      service: name=ntpd state=restarted
+
+    # ----------------09-10---------------------------------------------
+    - name: Verify Keepalived Install Status
+      shell: keepalived -version &> /dev/null
+      register: keepalived_status
+      when: VIP is defined
+      ignore_errors: true
+
+    - name: Check Verify HA Action [1/2]
+      yum: name=keepalived state=latest
+      when: ansible_default_ipv4.address != VIP and keepalived_status.rc != 0 and VIP is defined
+    
+    - name: Create Related Directory
+      file: path={{ WORKSPACE }}/bin/ state=directory
+
+    - name: Copy Related File
+      copy: src={{ DIR }}/module/template/distribution/getNetwork.sh dest={{ WORKSPACE }}/bin/getNetwork.sh mode=0755  
+ 
+    - name: Update  Network Card Name
+      shell: '{{ WORKSPACE }}/bin/getNetwork.sh {{ ansible_default_ipv4.address }}'
+      register: network_name
+
+    - name: Update HA COnfigure [2/2]
+      template: src={{ DIR }}/module/template/keepalived.conf dest=/etc/keepalived/keepalived.conf mode=0644
+      when: ansible_default_ipv4.address != VIP and keepalived_status.rc != 0 and VIP is defined
+
+    - name: Enable Keepalived Service
+      service: name=keepalived enabled=yes
+      when: ansible_default_ipv4.address != VIP and keepalived_status.rc != 0 and VIP is defined
+
+    - name: Start Keepalived Service
+      service: name=keepalived state=restarted
+      when: ansible_default_ipv4.address != VIP and keepalived_status.rc != 0 and VIP is defined
+    # -----------------------------------------------------------------      
+    
+    - name: Copy Docker Distribution Config File
+      copy: src={{ DIR }}/bin/tool dest={{ WORKSPACE }}/docker/ mode=0755
+
+    - name: Enable Remote Acess
+      lineinfile:
+        dest: /usr/lib/systemd/system/docker.service
+        state: present
+        regexp: '^ExecStart=/usr/bin/dockerd'
+        line: 'ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock'
+
+    - name: Copy Basic Config (Docker-ce [4/5]) Software
+      copy: src={{ DIR }}/template/daemon.json dest=/etc/docker/daemon.json force=yes mode=0644
+          
+    - name: Restart Basic (Docker-ce [5/5]) Service
+      service: name=docker state=restarted
+
+    ###################################
+    # Here Will Add Docker-Distribution Container
+    ###################################
+    - name: Create Docker-Distribution Related Directory
+      file: path=/var/lib/registry state=directory
+
+    - name: Copy run docker-distribution shell script
+      copy: src={{ DIR }}/module/template/distribution/docker_distribution.sh dest={{ WORKSPACE }}/docker/docker_distribution.sh mode=0755
+
+    - name: Copy Docker-Distribution Image
+      copy: src={{ DIR }}/module/images/docker-distribution.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644 
+
+    - name: Start docker distribution Container Instance
+      shell: "{{ WORKSPACE }}/docker/docker_distribution.sh"
+      register: distribution_container_status
+
+    ######################################################
+    - name: Install Dist Related Soft [1/3]
+      yum: name=devops-dist state=latest
+      when: distribution_container_status.rc != 0
+
+    # Here Need Some Enhance Later (port)   
+ 
+    - name: Enable docker-distribution [2/3] Service
+      service: name=docker-distribution enabled=yes
+      when: distribution_container_status.rc != 0
+
+    - name: Start docker-distribution [3/3] Service
+      service: name=docker-distribution state=started   
+      when: distribution_container_status.rc != 0 
+
+#    - name: Install Dist Related Soft [0/2]
+#      yum: name=devops-serv state=latest
+
+#    - name: Push Latest Tool [1/2]
+#      copy: src={{ DIR }}/module/v18/modules/ dest=/abcs/devops-abcsys/v18/modules/ mode=0755
+    
+#    - name: Start & Enable Agent [2/2]
+#      service: name=abcsys state=started enabled=yes
+
+    - name: Create Target Direatory
+      file: path={{ WORKSPACE }}/config  state=directory
+
+    - name: Create Target Direatory
+      file: path={{ WORKSPACE }}/bin  state=directory
+
+#    - name: Copy Basic Source Images(0/3)
+#      copy: src={{ DIR }}/images dest={{ WORKSPACE }}/ force=yes mode=0644
+
+#    - name: Copy Basic Source Images(1/3)
+#      copy: src={{ DIR }}/module/images/devops-registrator.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+#    - name: Copy Basic Source Images(2/3)
+#      copy: src={{ DIR }}/module/images/zookeeper.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+#    - name: Copy Basic Source Images(3/3)
+#      copy: src={{ DIR }}/module/images/mariadb.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/common_initial_images dest={{ WORKSPACE }}/bin/common_initial_images force=yes mode=0755
+
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/tool dest={{ WORKSPACE }}/bin/tool force=yes mode=0644
+
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/logs dest={{ WORKSPACE }}/bin/logs force=yes mode=0644
+
+    - name: Update Distribution Images[1/3-import]
+      shell:  '{{ WORKSPACE }}/bin/common_initial_images import'
+
+    - name: Update Distribution Images[2/3-update]
+      shell:  '{{ WORKSPACE }}/bin/common_initial_images update'
+
+#    - name: Update Distribution Images[3/3-push]
+#      shell:  '/bin/bash {{ WORKSPACE }}/bin/common_initial_images push'
+#      register: image_action_out
+   
+#    - name: Show Images Result
+#      debug: var=image_action_out.stdout verbosity=0
+
+#    - name: Update Repo File(0/2-Clean Tmp File)
+#      file: path=/etc/yum.repos.d/boc1.8.repo state=absent
+
+#    - name: Update Repo(1/2-Recovery)
+#      shell: mv /etc/yum.repos.d/bak/*.repo /etc/yum.repos.d/
+
+#    - name: Update Repo(2/2-Back )
+#      file: path=/etc/yum.repos.d/bak state=absent
+    
+#    - name: Clean Tmp Repo
+#      file: path=/etc/yum.repos.d/boc1.8.repo state=absent
+    #Here Need Clean-up Action

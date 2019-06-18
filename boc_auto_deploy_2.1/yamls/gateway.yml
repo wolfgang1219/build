@@ -1,0 +1,6 @@
+- hosts: GATEWAY
+  become: true
+  roles:
+    - paas_basic_gateway
+  tags:
+    - paas_basic_gateway

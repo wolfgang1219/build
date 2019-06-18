@@ -1,0 +1,18 @@
+- hosts: PORTAL
+  user: root
+  gather_facts: yes
+  tasks:
+    - name: Create Target Direatory
+      file: path=/opt/deploy/config  state=directory
+
+    - name: Copy Related Configuration File-[0/2]
+      copy: src={{ DIR }}/config/auth-config dest=/opt/deploy/config force=yes mode=0644
+
+    - name: Copy Related Configuration File-[1/2]
+      copy: src={{ DIR }}/config/other-config dest=/opt/deploy/config force=yes mode=0644
+
+    - name: Copy Related Configuration File-[2/2]
+      copy: src={{ DIR }}/bin/run_portal dest=/opt/deploy/bin/run_portal force=yes mode=0644
+
+    - name: Run CAAS
+      command: sh {{ DIR }}/bin/run_portal {{ APP_TYPE }}

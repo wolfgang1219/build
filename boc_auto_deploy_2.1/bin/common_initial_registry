@@ -1,0 +1,124 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+. $DIR/bin/common_tool
+. $DIR/bin/tool
+. $DIR/bin/logs
+
+CONFIG_FILE=$DIR/config/Common.conf
+
+registry_action=$(crudini --get $CONFIG_FILE REGISTRY REGISTRY_RE_INSTALL)
+external_ntp_server=$( crudini --get $CONFIG  DEFAULT EXTERNAL_NTP_SERVER)
+
+#function add_registry_into_hosts
+#{
+#  
+#   CONFIG=${1?"Need Common Configuration File"}
+#   R_IP=$(crudini --get $CONFIG REGISTRY REGISTRY_HOST_IP)
+#   R_DN=$(crudini --get $CONFIG REGISTRY REGISTRY_DOMAIN_NAME)
+#   R_PORT=$(crudini --get $CONFIG REGISTRY REGISTRY_PORT)
+#
+#   REGISTRY_URL=$R_DN":"$R_PORT
+#
+#   source_into_file REGISTRY_URL $REGISTRY_URL
+#
+#   Record=$R_IP" "$R_DN
+#
+#   echo $Record > $DIR/hosts/hosts
+#}
+
+function update_registry_for_docker
+{
+     _log_info "Update Registry For Docker"
+     NEW=${1?"Need New Registry Record"}
+     #registry_lists=$(cat $DIR/template/daemon.json |awk 'NR>2{print p}{p=$0}')
+     registry_lists=$(cat $DIR/template/daemon.json | grep insecure-registries)
+
+     if [[ $registry_lists == *"$NEW"* ]]
+     then
+         _log_info $NEW " is existing , skip this ..."
+     else
+          _log_info $NEW " not existing , add this into resource pool"
+         new_url=",\"$NEW\""
+         sed -i 's/]/\ '$new_url'\ ]/g' $DIR/template/daemon.json > /dev/null
+     fi
+}
+
+
+function install_registry
+{
+    ###############################################################
+    _banner_index "Install & Initial Distribution"
+    # Verify HA Enabled Or Not
+    registry_ha_action=$(crudini --get $CONFIG_FILE REGISTRY  REGISTRY_HA_ENABLED)
+    if [[ $registry_ha_action == "true " || $registry_ha_action == "True" ]]
+    then 
+        _log_info "Registry HA Enabled ----------------------------"
+        # Enable HA  Setting
+    	VIP=$(crudini --get $CONFIG_FILE REGISTRY REGISTRY_CLUSTER_VIP)
+        # Tmp Fix
+        source_into_file R_VIP $VIP
+    	ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/prepare_distribution.yaml --extra-vars "DIR=$DIR WORKSPACE=$default_workspace VIP=$VIP E_NTP_SERVER=$external_ntp_server"
+    	if [[ $? -eq 0 ]]
+    	then
+    	    EXECUTE_NEXT_STEP_FLAG=0
+    	    # Here Need Support VIP   
+    	    crudini --set $CONFIG_FILE REGISTRY REGISTRY_RE_INSTALL False &>/dev/null
+    	    [ $? -eq 0 ] && _log_succ "REGISTRY Flag Seting:  Done" || _log_err "REGISTRY Flag Seting:  Meet Error"
+    	else
+    	    EXECUTE_NEXT_STEP_FLAG=1
+    	fi
+    else
+         _log_info "Registry HA Not Enabled"
+        # Disable HA Setting
+        REGISTRY_IP=$(crudini --get $CONFIG_FILE REGISTRY REGISTRY_HOST_01_IP)
+        ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/prepare_distribution.yaml --extra-vars "DIR=$DIR WORKSPACE=$default_workspace  E_NTP_SERVER=$external_ntp_server"
+        if [[ $? -eq 0 ]]
+        then
+            EXECUTE_NEXT_STEP_FLAG=0
+            # Here Need Support VIP
+            crudini --set $CONFIG_FILE REGISTRY REGISTRY_RE_INSTALL False &>/dev/null
+            [ $? -eq 0 ] && _log_succ "REGISTRY Flag Seting:  Done" || _log_err "REGISTRY Flag Seting:  Meet Error"
+        else
+            EXECUTE_NEXT_STEP_FLAG=1
+        fi
+
+
+    fi
+}
+
+
+# HA - keepalived
+function enable_keepalived
+{
+    _banner_index "Check Distribution HA Status"
+    registry_ha_action=$(crudini --get $CONFIG_FILE REGISTRY  REGISTRY_HA_ENABLED)
+    if [[ $registry_ha_action == "True" || $registry_ha_action == "true" ]]
+    then
+	VIP=$(crudini --get $CONFIG_FILE REGISTRY REGISTRY_CLUSTER_VIP)
+        ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/prepare_distribution.yaml --extra-vars "DIR=$DIR WORKSPACE=$default_workspace VIP=$VIP"
+    #else
+	# No
+    fi
+     
+}
+
+function common_initial_registry_action
+{
+    if [[ $registry_action == "True" || $registry_action == "true" ]]
+    then
+        add_registry_into_hosts $DIR/config/Common.conf
+        update_registry_for_docker $REGISTRY_URL
+        install_registry
+    else
+       _log_info "No Need Re-Install, Skip This Module..." 
+    fi
+}

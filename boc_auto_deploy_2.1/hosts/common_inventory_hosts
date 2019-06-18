@@ -1,0 +1,91 @@
+[ENV]
+192.168.2.218 ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.219 ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.216 ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.217 ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.215 ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[DB]
+192.168.2.215 host_var_ip=192.168.2.215 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.218 host_var_ip=192.168.2.218 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.219 host_var_ip=192.168.2.219 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[NFS]
+192.168.2.215 host_var_ip=192.168.2.215 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[MQ]
+192.168.2.215 host_var_ip=192.168.2.215 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[REDIS]
+192.168.2.218 host_var_ip=192.168.2.218 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.219 host_var_ip=192.168.2.219 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[XXLJOB]
+192.168.2.216 host_var_ip=192.168.2.216 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[CONSUL]
+192.168.2.215 host_var_ip=192.168.2.215 consul_node_role=server consul_bootstrap_expect=true ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.216 host_var_ip=192.168.2.216 consul_node_role=client ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.217 host_var_ip=192.168.2.217 consul_node_role=client ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.218 host_var_ip=192.168.2.218 consul_node_role=client ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+192.168.2.219 host_var_ip=192.168.2.219 consul_node_role=client ansible_user="root" ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[ARTIFACTORY]
+192.168.2.217 host_var_ip=192.168.2.217 ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_web]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_generalpurpose]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_basic_license]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_basic_upms]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_basic_pipeline]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_basic_report]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_application]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_deployer]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_runtime]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_monitor]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_appstore]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+
+[paas_business]
+192.168.2.216    ansible_user="root"  ansible_ssh_pass="cobbler" ansible_become_pass="cobbler"
+
+

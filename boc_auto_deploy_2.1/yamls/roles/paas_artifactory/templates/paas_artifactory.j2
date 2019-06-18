@@ -1,0 +1,23 @@
+#!/bin/bash
+base_name="artifactory-oss"
+container_svr_name="${base_name}-$(hostname -s)"
+
+CONTAINER_NAME=$(docker ps --all -f name=${container_svr_name} -q)
+if [ "$CONTAINER_NAME" != "" ];then
+    docker stop $CONTAINER_NAME
+    docker rm $CONTAINER_NAME
+fi
+docker run -d --name ${container_svr_name} --restart=always \
+           -v /var/opt/jfrog/artifactory:/var/opt/jfrog/artifactory \
+           -v /var/run/docker.sock:/var/run/docker.sock \
+           -e EXTRA_JAVA_OPTIONS='-Xms512m -Xmx2g -Xss256k -XX:+UseG1GC' \
+           --net=host deploy.bocloud/paas/${base_name}:latest
+
+sleep 5
+
+svr_runing=$(docker ps -a | grep "${container_svr_name}" | egrep "Up [About]|[0-9]{1,}")
+if [[ ${svr_runing} == "" ]];
+then
+    echo -e "\nError: ${container_svr_name} failed to start...\n"
+    exit 1
+fi

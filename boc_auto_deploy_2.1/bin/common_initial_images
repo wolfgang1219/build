@@ -1,0 +1,141 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+. $DIR/tool
+. $DIR/logs
+
+IMAGES_PATH=$DIR/../images/
+
+IMAGE_LIST=$(find $IMAGES_PATH -name *.tar)
+
+IMAGE_ACTION_FLAG=""
+
+exsit_image=$(docker images| awk 'NR > 1{print $3}')
+
+#Images Need Push To Remote Register
+function images_load
+{
+    if [[ $exsit_image ]] 
+    then
+        docker images | awk 'NR>1{print $3}'|xargs docker rmi -f > /dev/null
+    fi
+    for IMAGE_INDEX in $IMAGE_LIST
+    do
+         docker load < $IMAGE_INDEX &> /dev/null
+         if [ $? -eq 0 ]
+         then
+              IMAGE_ACTION_FLAG=0
+              _log_succ "Load Image [ $IMAGE_INDEX ] : Success" 
+         else
+              IMAGE_ACTION_FLAG=1
+              _log_err "Load Image [ $IMAGE_INDEX ] : Fail"
+         fi
+    done
+}
+
+function update_images_domain
+{
+    image_local_list=$(docker images| awk 'NR>1 {print $1":"$2}')
+    image_target_url=$REGISTRY_URL
+
+    for update_url in $image_local_list
+    do
+       image_target_name=$(echo $update_url|awk -F ":" {'print $2'}| awk -F "5000/" {'print $2'})
+       docker tag $update_url $image_target_url"/"$image_target_name":"$RELEASE_TAGS
+       #Here Need Clean Up Action
+       docker rmi $update_url > /dev/null
+       [ $? -eq 0 ] && IMAGE_ACTION_FLAG=0 || IMAGE_ACTION_FLAG=1
+       echo "Untag $update_url"
+     
+    done
+
+}
+
+function push_images_into_registry
+{
+    #registry_url=${1?"Registry URL <IP:PORT>"}
+    #registry_ip=$(crudini --get config/Common.conf REGISTRY REGISTRY_DOMAIN_NAME)
+    #registry_port=$(crudini --get config/Common.conf REGISTRY REGISTRY_PORT)
+
+    #registry_url=$(docker images| awk 'NR > 1 {print $1}')
+    
+    PUSH_IMAGE_LIST=$(docker images| awk 'NR > 1 {print $1":"$2}') 
+    for IMAGE_NEW_INDEX in $PUSH_IMAGE_LIST
+    do
+         #echo $IMAGE_NEW_INDEX >> /tmp/images.log
+         docker push $IMAGE_NEW_INDEX &> /dev/null
+         if [ $? -eq 0 ]
+         then
+              IMAGE_ACTION_FLAG=0
+              _log_succ "Push Image [ $IMAGE_NEW_INDEX ] : Success" 
+         else
+              IMAGE_ACTION_FLAG=1
+              _log_err "Push Image [ $IMAGE_NEW_INDEX ] : Fail"
+         fi
+         sleep 3
+    done
+
+}
+
+function common_initial_images_action
+{
+     #00 Load Image
+     images_load
+     if [ $IMAGE_ACTION_FLAG -eq 0 ] 
+     then
+         sleep 3
+         #01 Update Format
+         update_images_domain
+         if [ $IMAGE_ACTION_FLAG -eq 0 ]
+         then
+             sleep 3
+             #02 Push Registry 
+             push_images_into_registry 
+             [ $? -eq 0 ] && IMAGE_ACTION_FLAG=0 || IMAGE_ACTION_FLAG=1
+         else 
+             exit 1
+         fi
+     else
+          exit 1
+     fi
+}
+
+function common_initial_images_center
+{
+     action_type=${1?"Please Give Your Order...."}
+     case $action_type in
+            import)
+                       echo "*********  Image Import  *************************"
+                       images_load
+                       ;;
+            update)
+                       echo "*********  Image Update  *************************"
+                       update_images_domain
+                       ;;
+            push)
+                       echo "*********  Image Push  *************************"
+                       push_images_into_registry
+                       ;;
+            all)
+                       echo "*********  Image All  *************************"
+                       common_initial_images_action
+                       ;;
+            *)
+                       echo "Error , Re-Check Again"
+                       ;;
+        esac
+
+}
+common_initial_images_center $1
+
+#common_initial_images_action

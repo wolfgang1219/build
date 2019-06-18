@@ -1,0 +1,24 @@
+server_port: 9021
+data_prefix: paas_basic_upms
+
+login:
+  sso: false 
+  expire: 7200
+
+ldap:
+  enable: true
+  url: {{ldap_url}}
+  baseDN: {{ldap_base_dn}}
+  userName: {{ldap_user_dn}}
+  password: {{ldap_credentials}}
+  authentication: simple
+  anonymous: false
+  organizationFilter: 
+    objectClass: organizationalUnit
+  userFilter:
+    objectClass: person,user
+
+systemconfig:
+  bocInstance: true
+  bomsInstance: false
+  devopsInstance: false

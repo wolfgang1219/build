@@ -1,0 +1,23 @@
+data_url: {{DB_IP}}:{{DB_PORT}}
+data_username: {{DB_USER}}
+data_password: {{DB_PASS}}
+data_initialSize: 10
+data_minIdle: 20
+data_maxActive: 500
+data_maxWait: 60000
+data_timeBetweenEvictionRunsMillis: 60000
+data_minEvictableIdleTimeMillis: 30000
+data_validationQueryTimeout: 10
+mq_url: {{MQ_IP}}
+mq_username: {{MQ_USER}}
+mq_password: {{MQ_PASS}}
+redis_url: {{REDIS_IP}}
+redis_password: {{REDIS_PASS}}
+redis_max-idle: 20
+redis_min-idle: 5
+redis_max-active: 200
+redis_max-wait: 10000
+redis_timeout: 30000
+# xxljob_url: http://192.168.2.170:9024/paas-basic-task
+xxljob_url: http://{{XXLJOB_IP}}:9024/paas-basic-task
+xxljob_logretentiondays: 3

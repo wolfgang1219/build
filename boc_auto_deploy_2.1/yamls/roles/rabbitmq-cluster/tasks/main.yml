@@ -1,0 +1,28 @@
+---
+- name: find master one
+  set_fact: rabbitmq_cluster_master="{{ansible_fqdn}}" 
+  run_once: true 
+  delegate_to: "{{ groups['MQ'][0] }}"
+
+- import_tasks: hosts.yml
+  when: update_hosts
+
+- import_tasks: install/main.yml
+
+- import_tasks: erlang_cookie.yml
+  when: rabbitmq_create_cluster
+
+- import_tasks: tls.yml
+  when: enable_tls
+
+- import_tasks: config.yml
+
+- import_tasks: service.yml
+
+- import_tasks: cluster.yml
+  when: rabbitmq_create_cluster == true
+
+- import_tasks: create_users.yml
+
+- import_tasks: enable_ha_queues.yml
+  when: backup_queues_in_two_nodes

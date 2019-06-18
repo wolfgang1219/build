@@ -1,0 +1,118 @@
+- hosts: all
+  become: true
+  roles:
+    - environment
+  tags:
+    - environment
+
+- hosts: paas_web
+  become: true
+  roles:
+    - paas_web 
+  tags:
+    - paas_web
+
+- hosts: paas_application
+  become: true
+  roles:
+    - paas_application
+  tags:
+    - paas_application
+
+- hosts: paas_appstore
+  become: true
+  roles:
+    - paas_appstore
+  tags:
+    - paas_appstore
+
+- hosts: paas_basic_access_log
+  become: true
+  roles:
+    - paas_basic_access_log
+  tags:
+    - paas_basic_access_log
+
+- hosts: paas_basic_auth
+  become: true
+  roles:
+    - paas_basic_auth
+  tags:
+    - paas_basic_auth
+
+- hosts: paas_basic_license
+  become: true
+  roles:
+    - paas_basic_license
+  tags:
+    - paas_basic_license
+
+- hosts: paas_basic_logger
+  become: true
+  roles:
+    - paas_basic_logger
+  tags:
+    - paas_basic_logger
+
+- hosts: paas_basic_pipeline
+  become: true
+  roles:
+    - paas_basic_pipeline
+  tags:
+    - paas_basic_pipeline
+
+- hosts: paas_basic_registry_center
+  become: true
+  roles:
+    - paas_basic_registry_center
+  tags:
+    - paas_basic_registry_center
+
+- hosts: paas_basic_report
+  become: true
+  roles:
+    - paas_basic_report
+  tags:
+    - paas_basic_report
+
+- hosts: paas_basic_user
+  become: true
+  roles:
+    - paas_basic_user
+  tags:
+    - paas_basic_user
+
+- hosts: paas_business
+  become: true
+  roles:
+    - paas_business
+  tags:
+    - paas_business
+
+- hosts: paas_data_authority
+  become: true
+  roles:
+    - paas_data_authority
+  tags:
+    - paas_data_authority
+
+- hosts: paas_deployer
+  become: true
+  roles:
+    - paas_deployer
+  tags:
+    - paas_deployer
+
+- hosts: paas_monitor
+  become: true
+  roles:
+    - paas_monitor
+  tags:
+    - paas_monitor
+
+- hosts: paas_runtime
+  become: true
+  roles:
+    - paas_runtime
+  tags:
+    - paas_runtime

@@ -1,0 +1,27 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: cleanup data redis
+  file: path=/opt/redis-cluster state=absent
+  
+- name: redis directory
+  file: path=/opt/redis-cluster state=directory
+
+- name: template config
+  copy: src=redis-cluster/ dest=/opt/redis-cluster 
+
+- name: Copy Redis Container Related File(1/1)
+  template: src=docker_redis.j2 dest={{ DEFAULT_WORKSPACE }}/docker/docker_redis.sh mode=0755
+
+- name: Start Redis Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/docker_redis.sh"
+  register: redis_container_status
+
+- name: keep safe to finish for redis
+  wait_for: timeout=20
+
+- name: join redis cluster
+  shell: "echo 'yes' | docker exec -i redis1 redis-cli -a Beyond@123456 --cluster create {{REDIS_HOSTS}}  --cluster-replicas 1"
+  delegate_to: "{{ groups['REDIS'][0] }}"
+  run_once: true
+  ignore_errors: true

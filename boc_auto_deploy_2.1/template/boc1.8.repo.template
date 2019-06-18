@@ -1,0 +1,23 @@
+[boc]
+name = boc
+baseurl = http://192.168.1.34/boc/boc1.8-tmp/boc1.8
+enable = 1
+gpgcheck = 0
+
+[extra]
+name = extra
+baseurl = http://192.168.1.34/boc/boc1.8-tmp/extra-1.8
+enable = 1
+gpgcheck = 0
+
+[extra-18]
+name = extra171
+baseurl = http://192.168.1.34/boc/boc1.8-tmp/extra
+enable = 1
+gpgcheck = 0
+
+[centos-73]
+name = centos73
+baseurl = http://192.168.1.34/boc/boc1.8-tmp/centos73
+enable = 1
+gpgcheck = 0

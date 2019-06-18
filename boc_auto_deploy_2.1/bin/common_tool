@@ -1,0 +1,73 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+#Add Related Vars Into File
+function source_into_file
+{
+   key=${1?"Key Need"}
+   value=${2?"$1 Value Need"}
+
+   if [ ! -f $DIR/bin/tool ]
+   then
+      touch $DIR/bin/tool
+      echo "#!/bin/bash" >> $DIR/bin/tool
+   else
+      content=$(cat $DIR/bin/tool | awk {'print $2'})
+      if [[ $content == *$key* ]]
+      then
+         _log_info $key" is exist , Skipping this."
+      else
+         case  "$key"  in
+          "CI_HOST_PASS" | "MQ_PASS" | "DB_PASS" | "CI_PASS" | "ldap_credentials" )
+             echo "export $key='"$value"'" >> $DIR/bin/tool
+             ;;
+          *)
+             echo "export $key="$value >> $DIR/bin/tool
+             ;;
+         esac 
+      fi
+   fi
+}
+
+
+#Get The Key-Value From Related Configure File
+function get_value_from_config
+{
+   CONFIG_FILE=${1?"Config Need"}
+   SECTION_NAME=${2?"Section Need"}
+   TARGET_KEY=${3?"TARGET_KEY Need"}
+   
+   out=$(crudini --get $CONFIG_FILE  $SECTION_NAME $TARGET_KEY) 
+
+   return $out
+}
+
+
+#Set The Key-Value Into Related Configure File
+function set_value_into_config
+{
+   CONFIG_FILE=${1?"Config Need"}
+   SECTION_NAME=${2?"Section Need"}
+   TARGET_KEY=${3?"TARGET_KEY Need"}
+   TARGET_VALUE=${3?"TARGET_VALUE Need"}
+
+   crudini --set $CONFIG_FILE  $SECTION_NAME $TARGET_KEY $TARGET_VALUE  > /dev/null
+   if [ $? -eq 0 ]
+   then
+       #_log_succ "[1/1]  Config : [PASS]"
+       EXECUTE_NEXT_STEP_FLAG=0
+   else
+       #_log_err "[1/1]  Config : [FAILED]"
+       EXECUTE_NEXT_STEP_FLAG=1
+   fi
+   return $EXECUTE_NEXT_STEP_FLAG
+}
+

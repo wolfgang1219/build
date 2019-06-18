@@ -1,0 +1,8 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy paas_basic_gateway Container Related File(1/1)
+  template: src=paas_basic_gateway.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_basic_gateway.sh mode=0755
+
+- name: Start paas_basic_gateway Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_basic_gateway.sh"

@@ -1,0 +1,30 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: mayunhao@beyondcent.com, beyondcent.com}
+## Date  : 2017/8/8
+##
+#####################################################
+
+filename=$2
+
+[ -z $filename ] && {
+    echo { \
+        \"status\": \"500\", \"reason\": \"param is not found\" \
+    }
+    exit 1
+}
+
+[ -f $filename ] || {
+    echo { \
+        \"status\": \"500\", \"reason\": \"file [$filename] not exists\" \
+    }
+    exit 1
+}
+logcontent=$(cat $filename)
+#echo "{ \
+#    \"status\": \"200\", \"content\": \"$logcontent\" \
+#}"
+echo "$logcontent"

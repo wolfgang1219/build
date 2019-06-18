@@ -1,0 +1,28 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/07/20
+##
+#####################################################
+
+DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+function start_database
+{
+    DB_PASS=${1?"Need DataBase Password"}
+    DB_PORT=${2?"Need Port"}
+    CONTAINER_DB=$(docker ps --all -f name=mariadb -q)
+    if [ "$CONTAINER_DB" != "" ]
+    then
+       docker stop $CONTAINER_DB
+       docker rm $CONTAINER_DB
+    fi
+
+    docker run --name mariadb --restart=always -v /etc/localtime:/etc/localtime -v /var/mariadb/datadir:/var/lib/mysql -p {{DB_PORT}}:3306 -e TIMEZONE=Asia/Shanghai -e MYSQL_USER={{DB_USER}} -e MYSQL_PASSWORD='{{DB_PASS}}' -e MYSQL_ROOT_PASSWORD='{{DB_PASS}}' -d deploy.bocloud/paas/mariadb:10.1.31 --max_connections=8192 --lower_case_table_names=1 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci &>/dev/null
+   
+}
+
+start_database $1 $2

@@ -1,0 +1,5 @@
+{
+  "insecure-registries" : ["dcr.io:5000","registry01.com:5000","registry02.com:5000","registry.example.com:5000" ,"abcsys.cn:5000"  ,"minrat.com:5000"  ,"abc666.com:5000"  ,"bocloud.com:5000"  ,"wxns.com:5000"  ,"registry.test.com:5000" ] ,
+  "log-driver": "json-file" ,
+  "log-opts": { "max-size" : "100m", "max-file" : "3" }
+}

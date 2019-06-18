@@ -1,0 +1,387 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+#DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+. $DIR/bin/common_tool
+
+LOCAL_IP=$(echo $(ip -4 route get '8.8.8.8') | awk '{print $7}')
+
+CONFIG_FILE="$DIR/config/Common.conf"
+
+function payload_verify
+{
+    #Verify The Source File
+    payload_path=$(crudini --get $CONFIG_FILE DEFAULT PAYLOAD_PATH)
+    payload_useage=$(du -sm $payload_path | awk {'print $1'})
+    #Check SQL-file Status
+    sql_path=$(ls -A $payload_path/sql | wc -l )
+    if [ $sql_path -lt 5 ] 
+    then
+         _log_err "SQL File Status Is Not OK , Please Pay More Attention Here!"
+         EXECUTE_NEXT_STEP_FLAG=1
+         exit 1
+    fi
+    waiting_time=0
+    while sleep 3
+    do
+    payload_useage_01=$(du -sm $payload_path | awk {'print $1'})
+    #Here Need More enhance
+    echo $payload_useage_01  $payload_path
+    # if [[ $payload_useage_01 -gt 900 && $payload_useage_01 -eq $payload_useage ]]
+    # then
+        _log_info "Start Copy Related File"
+        #Start Copy Action
+        rm -rf $DIR/images/* > /dev/null 2>&1
+
+        cp -r $payload_path/* $DIR/images/
+        if [[ $? -eq 0 ]]
+        then
+             _log_succ "Images & SQL File Copy  :  PASS"
+             break
+        else 
+             _log_err "Images & SQL File Copy : FAILD"
+             continue
+        fi
+    #else
+    #    _log_warn "Package is not Ready, Waiting ..."
+    #    let waiting_time=$waiting_time+3
+    #    if [[ $waiting_time -gt 90 ]]
+    #    then
+    #       EXECUTE_NEXT_STEP_FLAG=1
+    #       exit 1
+    #    fi
+    #fi
+    done
+}
+
+# Common Set vars
+function set_common_vars
+{
+    #Tags
+    RELEASE_TAGS=$(crudini --get $CONFIG_FILE PORTAL PORTAL_TAGS)
+    #echo "export TAGS="$TAGS >> $DIR/bin/tool
+    source_into_file RELEASE_TAGS $RELEASE_TAGS
+    
+    #logPath
+    logBasePath=$(crudini --get $CONFIG_FILE PORTAL PORTAL_LOG_PATH)
+    #echo "export logBasePath="$logBasePath >> $DIR/bin/tool
+    source_into_file logBasePath $logBasePath
+    
+    default_workspace=$(crudini --get $CONFIG_FILE PORTAL PORTAL_WORKSPACE)
+    source_into_file default_workspace $default_workspace
+
+    NTP_SERVER=$(crudini --get $CONFIG_FILE DEFAULT EXTERNAL_NTP_SERVER)
+    source_into_file NTP_SERVER $NTP_SERVER
+}
+
+#DB related 
+function DB_Config
+{
+    _banner_index "DataBase Related Config"
+	
+    #DB_HOST=$(crudini --get $CONFIG_FILE DB DB_CLUSTER_VIP)
+    DB_HOST=$(crudini --get $CONFIG_FILE DB DB_HOST_IP)
+    DB_PORT=$(crudini --get $CONFIG_FILE DB DB_PORT)
+    DB_USER=$(crudini --get $CONFIG_FILE DB DB_USER)
+    DB_PASS=$(crudini --get $CONFIG_FILE DB DB_PASS)
+    source_into_file DB_PORT $DB_PORT
+    source_into_file DB_USER $DB_USER
+    source_into_file DB_PASS $DB_PASS
+    source_into_file DB_HOST $DB_HOST
+    DB_PREFIX="jdbc:mysql://"
+    #Here May Need Update Later.
+    DB_NAME="nacha_auth"
+    DB_END="?characterEncoding=utf8&allowMultiQueries=true&&zeroDateTimeBehavior=convertToNull"
+
+#    TARGET_FILE=$DIR/config/auth-config/jdbc.properties    
+
+#    DB_URL=$DB_PREFIX$DB_HOST":"$DB_PORT"/"$DB_NAME$DB_END
+
+    #crudini --set $TARGET_FILE JDBC jdbc.url $DB_URL > /dev/null
+    #if [ $? -eq 0 ]
+    #then
+    #    _log_succ "[1/3] JDBC Config DB_URL : [PASS]"
+#	EXECUTE_NEXT_STEP_FLAG=0
+ #   else
+ #       _log_err "[1/3] JDBC Config DB_URL : [FAILED]"
+ #       EXECUTE_NEXT_STEP_FLAG=1
+ #   fi
+
+  #  crudini --set $TARGET_FILE JDBC jdbc.username $DB_USER > /dev/null
+  #  if [ $? -eq 0 ]
+  #  then
+  #      _log_succ "[2/3] JDBC Config DB_USER : [PASS]"
+#	EXECUTE_NEXT_STEP_FLAG=0
+#    else
+#        _log_err "[2/3] JDBC Config DB_USER : [FAILED]"
+#	EXECUTE_NEXT_STEP_FLAG=1
+#    fi
+    
+#    crudini --set $TARGET_FILE JDBC jdbc.password $DB_PASS > /dev/null
+#    if [ $? -eq 0 ]
+#    then
+#        _log_succ "[3/3] JDBC Config DB_PASSWORD : [PASS]"
+#	EXECUTE_NEXT_STEP_FLAG=0
+#    else
+#        _log_err "[3/3] JDBC Config DB_PASSWORD : [FAILED]"
+#	EXECUTE_NEXT_STEP_FLAG=1
+#    fi
+	#return $EXECUTE_NEXT_STEP_FLAG
+
+}
+
+function ZK_Config
+{
+    _banner_index "Zookeeper Related Config"
+    #Cluster Scope 
+    zk_ips=$(crudini --get $CONFIG_FILE ZK | grep _IP)
+    ZK_HOST=""
+    count=0
+    #-------------------------------------------------
+    # -UBOC-2834- 
+    for i in $zk_ips
+    do
+       ip=$(crudini --get $CONFIG_FILE ZK $i)
+       if [[ $ZK_HOST =~ $ip ]]
+       then
+           echo "ZK IP Is Exist , Skip This IP"
+       else
+           if [[ $count -eq 0 ]]
+           then
+               ZK_HOST=$ip
+           else
+               #ZK_HOST=$ZK_HOST","$ip
+               ZK_HOST=$ip
+           fi
+       fi
+       let count=$count+1
+    done
+    #--------------------------------------------------
+    source_into_file ZK_HOSTS $ZK_HOST 
+
+    ZK_PORT=$(crudini --get $CONFIG_FILE ZK ZK_PORT)
+    source_into_file ZK_PORT $ZK_PORT
+
+    ZK_URL=$ZK_HOST":"$ZK_PORT
+
+    #export ZK_URL=$ZK_URL
+    #echo "export ZK_URL="$ZK_URL >> $DIR/bin/tool
+
+    source_into_file ZK_URL $ZK_URL
+
+    TARGET_FILE=$DIR/config/other-config/zk.properties
+    crudini --set $TARGET_FILE ZK zk.server.url $ZK_URL > /dev/null
+    if [ $? -eq 0 ]
+    then
+	_log_succ "[1/1] Zookeeper Config : [PASS]"
+	EXECUTE_NEXT_STEP_FLAG=0
+    else
+	_log_err "[1/1] Zookeeper Config : [FAILED]"
+        EXECUTE_NEXT_STEP_FLAG=1
+    fi
+}
+
+# Add LDAP Support 
+function base_ldap_config_action
+{
+  _banner_index "LDAP Related Config"
+  # Get info
+  ldap_url=$(crudini --get $CONFIG_FILE LDAP ldap.url)
+  ldap_authentication=$(crudini --get $CONFIG_FILE LDAP ldap.authentication)
+  ldap_base_dn=$(crudini --get $CONFIG_FILE LDAP ldap.base_dn)
+  ldap_user_dn=$(crudini --get $CONFIG_FILE LDAP ldap.user_dn)
+  ldap_credentials=$(crudini --get $CONFIG_FILE LDAP ldap.credentials)
+  ldap_region=$(crudini --get $CONFIG_FILE LDAP ldap.region)
+  ldap_enable=$(crudini --get $CONFIG_FILE LDAP  ldap.enable)
+  
+  source_into_file ldap_url $ldap_url
+  source_into_file ldap_base_dn $ldap_base_dn
+  source_into_file ldap_credentials $ldap_credentials
+  source_into_file ldap_user_dn $ldap_user_dn
+  #ldap.anonymous=$(crudini --get $CONFIG_FILE LDAP ldap.anonymous)
+  #ldap.organization.type=$(crudini --get $CONFIG_FILE LDAP ldap.organization.type)
+  #ldap.user.type=$(crudini --get $CONFIG_FILE LDAP ldap.user.type)
+  #ldap.factory=$(crudini --get $CONFIG_FILE LDAP ldap.factory)
+  #ldap.enable=$(crudini --get $CONFIG_FILE LDAP ldap.enable)
+  #ldap.dc=$(crudini --get $CONFIG_FILE LDAP ldap.dc)
+  #ldap.maxActive=$(crudini --get $CONFIG_FILE LDAP ldap.url)
+
+
+#  TARGET_CONFIG=$DIR/config/auth-config/ldap.properties
+#
+#  # Update The Config
+#  crudini --set $TARGET_CONFIG LDAP ldap.enable $ldap_enable > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.enable ready" && status_url=0 || _log_err "ldap.enable Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.url $ldap_url > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.url ready" && status_url=0 || _log_err "ldap.url Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.authentication $ldap_authentication > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.authentication ready" && status_authentication=0 || _log_err "ldap.authentication Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.base_dn $ldap_base_dn > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.base_dn ready" && status_base_dn=0 || _log_err "ldap.base_dn Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.user_dn $ldap_user_dn > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.user_dn ready" && status_user_dn=0 || _log_err "ldap.user_dn Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.credentials $ldap_credentials > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.credentials ready" && status_credentials=0 || _log_err "ldap.credentials Meet Error"
+#
+#  crudini --set $TARGET_CONFIG LDAP ldap.region $ldap_region > /dev/null
+#  [ $? -eq 0 ] && _log_succ "ldap.region ready" && status_region=0 || _log_err "ldap.region Meet Error"
+#  
+#  if [ $status_url -eq 0 ] && [ $status_authentication -eq 0 ] && [ $status_base_dn -eq 0 ] && [ $status_user_dn -eq 0  ] && [ $status_credentials -eq 0 ] && [ $status_region -eq 0 ] 
+#  then
+#      _log_succ "[1/1] LDAP Config : [PASS]"
+#      EXECUTE_NEXT_STEP_FLAG=0
+#  else
+#      _log_err "[1/1] LDAP Config : [FAILED]"
+#      EXECUTE_NEXT_STEP_FLAG=1
+#      exit 1
+#  fi
+}
+
+function CONSUL_Config
+{
+    _banner_index "Consul Related Config"
+    CONSUL_HOST=$(crudini --get $CONFIG_FILE CONSUL CONSUL_HOST_IP)
+}
+function MQ_Config
+{
+    _banner_index "MQ Config"
+    MQ_HOST=$(crudini --get $CONFIG_FILE MQ MQ_HOST_IP)
+    MQ_PORT=$(crudini --get $CONFIG_FILE MQ MQ_PORT)
+    MQ_USER=$(crudini --get $CONFIG_FILE MQ MQ_USER)
+    MQ_PASS=$(crudini --get $CONFIG_FILE MQ MQ_PASS)
+    source_into_file MQ_HOST $MQ_HOST
+    source_into_file MQ_PORT $MQ_PORT
+    source_into_file MQ_USER $MQ_USER
+    source_into_file MQ_PASS $MQ_PASS
+}
+
+function reddis_Config
+{
+   REDIS_HOST=$(crudini --get $CONFIG_FILE REDIS REDIS_HOST_IP)
+   REDIS_HOSTS=""
+#  REDIS_PORT=$(crudini --get $CONFIG_FILE REDIS REDIS_PORT)
+#  REDIS_PASS=$(crudini --get $CONFIG_FILE REDIS REDIS_PASS)
+   source_into_file REDIS_HOST $REDIS_HOST
+   echo "redis->$REDIS_HOST"
+   for redis_list in ${REDIS_HOST//,/\ };do
+      REDIS_HOSTS="$REDIS_HOSTS $redis_list:7061 $redis_list:7062 $redis_list:7063"
+      echo $redis_list
+   done
+   echo $REDIS_HOSTS
+   source_into_file REDIS_HOSTS "\"${REDIS_HOSTS:1}\""
+#  source_into_file REDIS_PORT $REDIS_PORT
+#   source_into_file REDIS_PASS $REDIS_PASS
+}
+function xxljob_Config
+{
+   XXLJOB_HOST=$(crudini --get $CONFIG_FILE XXLJOB  XXLJOB_HOST_IP)
+   source_into_file XXLJOB_HOST $XXLJOB_HOST
+}
+function consul_Config
+{
+    CONSUL_HOST=$(crudini --get $CONFIG_FILE CONSUL CONSUL_HOST_IP)
+    CONSUL_PORT=$(crudini --get $CONFIG_FILE CONSUL CONSUL_PORT)
+    CONSUL_PASS=$(crudini --get $CONFIG_FILE CONSUL CONSUL_TOKEN)
+    source_into_file CONSUL_HOST $CONSUL_HOST
+    source_into_file CONSUL_PORT $CONSUL_PORT
+    source_into_file CONSUL_TOKEN $CONSUL_PASS
+}
+
+function gateway_Config
+{
+   GATEWAY_HOST=$(crudini --get $CONFIG_FILE GATEWAY GATEWAY_HOST_IP)
+   #GATEWAY_PORT=$(crudini --get $CONFIG_FILE GATEWAY GATEWAY_PORT)
+   GATEWAY_PORT=9022
+   source_into_file GATEWAY_HOST $GATEWAY_HOST
+   source_into_file GATEWAY_PORT $GATEWAY_PORT
+}
+function worker_Config
+{
+    WORKER_HOST=$(crudini --get $CONFIG_FILE WORKER WORKER_HOST_IP)
+    if [ "x$WORKER_HOST" != "x" ];then
+        source_into_file WORKER_HOST $WORKER_HOST
+    fi
+}
+function portal_Config
+{
+   #apollo_ip=$(crudini --get $CONFIG_FILE PORTAL Apollo_Host)
+   #source_into_file Apollo_IP $apollo_ip
+   paas_web_ip=$(crudini --get $CONFIG_FILE PORTAL paas_web_IP)
+   paas_logger_ip=$(crudini --get $CONFIG_FILE PORTAL paas_basic_logger_IP)
+   paas_runtime_ip=$(crudini --get $CONFIG_FILE PORTAL paas_runtime_IP)
+   paas_report_ip=$(crudini --get $CONFIG_FILE PORTAL paas_basic_report_IP)
+   #source_into_file PAAS_LOGGER_IP $paas_logger_ip
+   source_into_file PAAS_RUNTIME_IP $paas_runtime_ip
+   source_into_file PAAS_REPORT_IP $paas_report_ip
+   source_into_file PAAS_WEB_IP $paas_web_ip
+}
+function CI_Config
+{
+   isOK=$(crudini --get $CONFIG_FILE PIPLELINE)
+   pipe_line_ip=$(crudini --get $CONFIG_FILE PIPLELINE PIPELINE_HOST_IP)
+   if [ "x$isOK" != "x" -a "x$pipe_line_ip" != "x"  ];then
+     user_host=$(crudini --get $CONFIG_FILE DEFAULT BASE_USER)
+     passwd_host=$(crudini --get $CONFIG_FILE DEFAULT BASE_PASSWD)
+     source_into_file CI_USER "admin"  
+     source_into_file CI_PASS 'admin'
+     source_into_file CI_HOST_USER $user_host 
+     source_into_file CI_HOST_PASS $passwd_host
+     source_into_file CI_HOST_IP $pipe_line_ip
+   fi
+}
+function LB_Config
+{
+#  ha_lb_ip=$(crudini --get $CONFIG_FILE LB HA_LB_HOST_IP)
+   ha_lb_vip=$(crudini --get $CONFIG_FILE LB HA_LB_VIP)
+   [ "x$ha_lb_vip" = "x"  ] ||  source_into_file HA_LB_VIP ${ha_lb_vip}
+}
+function STOR_Config
+{
+   stor_ip=$(crudini --get $CONFIG_FILE NFS NFS_HOST_IP)
+   source_into_file STOR_HOST_IP $stor_ip
+}
+function base_common_config_action
+{
+#   payload_verify
+   EXECUTE_NEXT_STEP_FLAG=0
+   if [[ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]]
+   then
+        set_common_vars
+        STOR_Config
+        LB_Config
+        DB_Config
+        #ZK_Config
+        MQ_Config
+        reddis_Config
+        xxljob_Config
+        consul_Config
+        gateway_Config
+        worker_Config
+        portal_Config
+        CI_Config
+        base_ldap_config_action
+   else
+       exit 1
+   fi
+}
+
+function base_commone_clean_action
+{
+   #rm -rf $DIR/images/* &> /dev/null
+   rm -rf $DIR/hosts/*  &> /dev/null
+   echo "" > $DIR/bin/tool &> /dev/null
+   _log_succ "[1/2] Clean TestBed : [PASS]"
+}

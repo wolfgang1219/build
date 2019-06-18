@@ -1,0 +1,94 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: wuheng@{otcaix.iscas.ac.cn, beyondcent.com}
+## Date  : 2017/8/10
+##
+#####################################################
+
+function thisIP {
+    nic=$(cat /etc/abcsys/config | grep nic | grep -v grep | awk -F "=" '{print $2}')
+    res=$(ifconfig | grep $nic | grep -v grep)
+    if [[ -z $res ]]
+    then
+        echo "MissingOrWrongNICConfigException:/etc/abcsys/config"
+        exit 1
+    fi
+    ip=$(ifconfig $nic | grep inet | grep -v grep | head -1 | awk '{print $2}')
+    echo $ip
+}
+
+# Check 
+\cp /abcs/devops-pipe/config /etc/selinux/config
+setenforce 0
+systemctl stop firewalld
+systemctl disable firewalld
+
+# Check
+java=$(cat /etc/profile | grep JAVA_HOME | grep -v grep)
+jenkins=$(cat /etc/profile | grep JENKINS_HOME | grep -v grep)
+maven=$(cat /etc/profile | grep MAVEN_HOME | grep -v grep)
+
+sed -i '/'JAVA_HOME'/d' /etc/profile
+sed -i '/'JENKINS_HOME'/d' /etc/profile
+sed -i '/'MAVEN_HOME'/d' /etc/profile
+sed -i '/'ANT_HOME'/d' /etc/profile
+
+echo "JAVA_HOME=/usr/java/jdk1.8.0_144" >> /etc/profile 
+echo "JENKINS_HOME=/abcs/jenkins-2.46.3/jenkins" >> /etc/profile
+echo "MAVEN_HOME=/abcs/maven-3.5.0" >> /etc/profile 
+echo "ANT_HOME=/abcs/ant-1.10.1" >> /etc/profile 
+echo "PATH=$JAVA_HOME/bin:$MAVEN_HOME/bin:$ANT_HOME/bin:$PATH" >> /etc/profile 
+echo "export JAVA_HOME JENKINS_HOME MAVEN_HOME ANT_HOME PATH" >> /etc/profile
+
+source /etc/profile
+systemctl start mysqld
+
+res=$(mysql -uroot -ponceas -e "show databases;" | grep mysql)
+if [[ -z $res ]]
+then
+    systemctl stop mysqld
+    rm -rf /var/lib/mysql2
+    mkdir -p /var/lib/mysql2
+    mv -f /var/lib/mysql/* /var/lib/mysql2/*
+    rm -rf /var/lib/mysql/*
+    cd /abcs/devops-abcsys/pipe_mysql_installer
+    bash run_install.sh -i install -d
+else
+    mysql -uroot -ponceas -e "CREATE DATABASE sonar character set utf8;"
+fi
+
+while true
+do
+    as=$(systemctl status docker | grep "Active" | awk '{print $2}')
+    if [[ $as = "activating" ]]
+    then
+        sleep 3
+    else
+        break
+    fi
+done
+
+as=$(systemctl status docker | grep "Active" | awk '{print $2}')
+
+if [[ $as != "active" ]]
+then
+    echo "Please check /etc/docker/daemon.json"
+    exit 0
+fi
+
+# Check
+sed -i '/'sonar-db'/d' /etc/hosts
+sed -i '/'jenkins-server'/d' /etc/hosts
+sed -i '/'sonar-server'/d' /etc/hosts
+
+echo $(thisIP) sonar-server >> /etc/hosts
+echo $(thisIP) jenkins-server >> /etc/hosts
+echo 127.0.0.1 sonar-db >> /etc/hosts
+
+# Check
+echo "Load Clair"
+docker load <  /abcs/clair/clairwithpostgres.tar
+

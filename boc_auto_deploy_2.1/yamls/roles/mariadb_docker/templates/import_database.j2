@@ -1,0 +1,65 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+WORKSPACE=$1
+
+. $WORKSPACE/bin/logs
+
+
+SQL_PATH=$WORKSPACE/sql/
+
+######################
+#crate database
+function sql_inject_into_db
+{
+#    for DATABASE in $(ls $SQL_PATH*.sql | awk -F '/' '{print $NF}')
+#    do 
+#        #mysql -u${SQL_USER} -p${SQL_PASS}  << EOF 2> /dev/null
+#        echo ${DATABASE:-4}
+#        mysql -uroot -p"{{ DB_PASS }}" -h 127.0.0.1 -P{{ DB_PORT }} << EOF 2> /dev/null
+#        DROP DATABASE IF EXISTS $DATABASE;
+#        CREATE DATABASE $DATABASE; 
+#EOF
+#        [ $? -eq 0 ] && echo "created DB $DATABASE" || echo "DB $DATABASE already exists"
+#    
+#    done 
+#    
+    #init sql 
+    for sqlfile in $(ls $SQL_PATH*.sql)
+    do
+         sql=$(cat $sqlfile)
+         mysql -uroot -p'{{ DB_PASS }}' -h 127.0.0.1  -P{{ DB_PORT }} -e "${sql}"
+         [ $? -eq 0 ] && echo "init file $sqlfile success" || echo "init file $sqlfile faile"
+         
+         sleep 3
+    
+    done 
+}
+
+function import_database_action
+{
+    _banner_index "Initial And Import SQL File Into Database"
+    x=1
+    while true
+    do
+        MYSQL_PING=$(/usr/bin/mysqladmin -u root -p'{{ DB_PASS }}' -P{{ DB_PORT  }} -h 127.0.0.1 ping 2>/dev/null)
+        MYSQL_OK="mysqld is alive"
+        if [[ "$MYSQL_PING" == "$MYSQL_OK" ]]
+        then
+ 		break 
+	else
+		sleep 10
+	fi
+    done
+
+    sql_inject_into_db
+}
+#sql_inject_into_db
+import_database_action

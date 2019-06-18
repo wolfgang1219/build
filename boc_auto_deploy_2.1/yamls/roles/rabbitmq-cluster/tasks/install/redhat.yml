@@ -1,0 +1,11 @@
+- name: install rabbitmq-server dependencies (RedHat)
+  yum: name="{{ item }}" state=present enablerepo=uboc disable_gpg_check=yes
+  with_items:
+    - erlang
+    - libselinux-python
+
+- name: install rabbitmq-server (RedHat)
+  yum: name="rabbitmq-server-3.6.15" state=present enablerepo=uboc disable_gpg_check=yes
+
+- name: enable rabbitmq-server to survive reboot
+  service: name=rabbitmq-server enabled=yes

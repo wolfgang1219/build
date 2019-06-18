@@ -1,0 +1,53 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+. $DIR/bin/tool
+. $DIR/bin/logs
+
+LOCAL_IP=$(echo $(ip -4 route get '8.8.8.8') | awk '{print $7}')
+
+CONFIG_FILE=$DIR/config/Common.conf
+
+pipeline_action=$(crudini --get $CONFIG_FILE PIPLELINE PIPLELINE_RE_INSTALL)
+
+#Here Use Zabbix DB(mysql) as default DB, we will do some enhancement later
+#db_host=$(crudini --get  $CONFIG_FILE ZABBIX ZABBIX_HOST_IP)
+db_host=$(crudini --get  $CONFIG_FILE PIPLELINE PIPELINE_HOST_IP)
+db_user=root
+db_pass=onceas
+
+ci_host=$(crudini --get $CONFIG_FILE PIPLELINE PIPELINE_HOST_IP)
+
+
+function prepare_pipeline
+{
+     _banner_index "Prepare & Initial Pipeline Node"
+     ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/prepare_pipeline.yaml --extra-vars "DIR=$DIR WORSPACE=$default_workspace NTP_SERVER=$NTP_SERVER LOCAL_IP=$LOCAL_IP DB_HOST=$db_host DB_USER=$db_user DB_PASS=$db_pass CI_HOST=$ci_host" 
+     if [[ $? -eq 0 ]]
+     then
+         EXECUTE_NEXT_STEP_FLAG=0
+         _log_succ "Pipeline Module Install : [PASS]"
+         crudini --set $CONFIG_FILE PIPLELINE PIPLELINE_RE_INSTALL False &>/dev/null
+         [ $? -eq 0 ] && _log_succ "Pipeline Flag Seting:  Done" || _log_err "Pipeline Flag Seting:  Meet Error"
+     else
+         EXECUTE_NEXT_STEP_FLAG=1
+     fi
+}
+
+function common_install_pipeline_action
+{
+   if [[ $pipeline_action == "True" || $pipeline_action == "true" ]]
+   then
+       prepare_pipeline
+   else
+        _log_info "No Need Re-Install, Skip This Module..."
+   fi
+}
+

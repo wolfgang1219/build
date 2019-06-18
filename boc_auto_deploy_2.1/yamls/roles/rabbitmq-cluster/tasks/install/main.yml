@@ -1,0 +1,15 @@
+---
+# Multi-OS support 
+- include: debian.yml
+  when: ansible_os_family == 'Debian'
+
+- include: redhat.yml
+  when: ansible_os_family == 'RedHat'
+
+- name: customize logrotate rules
+  template:
+    src: etc/logrotate.d/rabbitmq-server.j2
+    dest: /etc/logrotate.d/rabbitmq-server
+    owner: root
+    group: root
+    mode: 0644

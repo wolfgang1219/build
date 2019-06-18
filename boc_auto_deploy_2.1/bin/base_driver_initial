@@ -1,0 +1,257 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+. $DIR/bin/tool
+
+LOCAL_IP=$(echo $(ip -4 route get '8.8.8.8') | awk '{print $7}')
+
+#CRUDINI Confirm
+function CRUDINI_Check
+{
+    _banner_index "Install Related SoftWare [CRUDINI]"
+
+    crudini --version &> /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[1/1] Soft [crudini] Install : [PASS] "
+    else
+        _log_err "[1/1] Soft [crudini] , NOT Ready , New Software Install Job Start"
+       sudo rpm -Uvh $DIR/rpms/crudini-*.rpm > /dev/null
+       if [ $? -eq 0 ]
+       then
+            _log_succ "[1/3] Soft [crudini] Install : [PASS]"
+            EXECUTE_NEXT_STEP_FLAG=0
+        else
+             _log_err "[1/3] Soft [crudini] Install : [FAILED]"
+             EXECUTE_NEXT_STEP_FLAG=1
+      fi
+    fi
+}
+
+
+function basic_version_verify
+{
+   _banner_index "Verify Basic OS Version"
+   out_version=$(cat $DIR/config/Common.conf | grep SUGGEST_OS_VERION| awk -F "=" {'print $2'}||sed s/[[:space:]]//g)
+   current_version=$(cat /etc/redhat-release|awk -F " " {'print $4'})
+   if [ $out_version == $current_version  ]
+   then
+        _log_info "Current Version Is :[ $current_version ]"
+        _log_succ "[0] Basic Version Check : [PASS]"
+        EXECUTE_NEXT_STEP_FLAG=0
+   else
+       _log_info "**********[Attention]************"
+       _log_warn "Current OS Version [$current_version] Not Match Our Support Version [$out_version]"
+       echo -e "\n\n"
+       read -t 30 -s -p "!!!Acknowledge & Continue This Job!!! Your Order: [Y/N]" order
+       echo -e "\n"
+       case $order in 
+            Y|y)
+                 echo "Yes"
+                 EXECUTE_NEXT_STEP_FLAG=0
+            ;;
+            N|n)
+                 echo "NO"
+                 EXECUTE_NEXT_STEP_FLAG=1
+            ;;
+            *)
+                 echo "Error , ReCheck Again"
+                 EXECUTE_NEXT_STEP_FLAG=1
+            ;;
+       esac
+   fi
+   
+}
+
+function initial
+{
+    sudo systemctl stop firewalld && sudo systemctl disable firewalld && sudo setenforce 0
+    mkdir /etc/yum.repos.d/bak
+    mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/bak
+}
+
+#Need Update
+function http_server_config
+{
+   _banner_index "Http Server Config"
+    httpd -version &> /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[1/2] Soft [Httpd] Install : [PASS] "
+    else
+        _log_warn "[1/2] Soft [Httpd] Server Status : [ NOT Ready] , New Software Install Job Start"
+       sudo rpm -Uvh $DIR/rpms/httpd-rpms/*.rpm --force &> /dev/null
+       if [ $? -eq 0 ]
+       then
+            _log_succ "[1/2] Soft[Httpd] Install : [PASS]"
+
+            #update rpms localtion
+            [ ! -f /var/www/html/boc ] && sudo mkdir -p /var/www/html/boc || echo "Ready!"
+            #------------------------------------------------------------------------
+            sudo systemctl enable  httpd.service && sudo cp -r $DIR/rpms  /var/www/html/boc && sudo systemctl restart  httpd.service
+            #------------------------------------------------------------------------
+            #update repo
+            sudo crudini --set $DIR/template/boc1.8.repo boc baseurl "http://"$LOCAL_IP"/boc/rpms"
+
+            EXECUTE_NEXT_STEP_FLAG=0
+
+        else
+             _log_err "[1/2] Soft [Httpd] Install : [FAILED]"
+             EXECUTE_NEXT_STEP_FLAG=1
+      fi
+    fi
+}
+function yumrepo_start
+{
+    _banner_index "yum repo starting"
+    if [ -f $DIR/images/yumrepo.tar ];then
+        docker load < $DIR/images/yumrepo.tar
+        container=$(docker ps --all -f name=yumrepo -q)
+        if [ "x$container" = "x" ];then
+            docker run --name yumrepo --restart=always --net=host -v $DIR/packages:/repo -d deploy.bocloud/yumrepo:latest
+        fi
+    else
+        EXECUTE_NEXT_STEP_FLAG=1
+        _log_err "yumrepo container start Failed"
+        exit 1
+    fi
+}
+
+function uboc_distribution_start
+{
+    _banner_index "uboc distribution starting"
+    if [ -f $DIR/images/uboc-deploy.tar ];then
+        imgx=$(docker images -f reference='uboc-deploy*' -q)
+        [ "x$imgx" = "x" ] && docker load < $DIR/images/uboc-deploy.tar
+        container=$(docker ps --all -f name=uboc_distribution -q)
+        if [ "x$container" = "x" ];then
+            docker run --name uboc_distribution --restart=always --net=host -d uboc-deploy:${RELEASE_TAGS}
+            if [[ $? != 0 ]];then
+                EXECUTE_NEXT_STEP_FLAG=1
+                _log_err "uboc distribution container start Failed"
+                exit 1
+            fi
+        fi
+    else
+        EXECUTE_NEXT_STEP_FLAG=1
+        _log_err "uboc distribution image load Failed"
+        exit 1
+    fi
+}
+
+function http_server_clean
+{
+    #service
+    sudo systemctl disable httpd.service && sudo rm -rf /var/www/html/boc && sudo systemctl stop  httpd.service
+    #rpm
+    #sudo yum remove httpd httpd-tools mailcap apr -y &>/dev/null
+    sudo rpm -e --nodeps httpd-tools httpd apr apr-util &>/dev/null
+    _log_succ "[2/2] Clean TestBed : [PASS]"
+}
+
+
+function python_related_install
+{
+    _banner_index "Install Python Related"
+    #setuptool
+    sudo tar -xzvf $DIR/rpms/python-related/setuptools-39.0.1.tar.gz -C /tmp/ &>/dev/null && cd /tmp/setuptools-39.0.1 && sudo python setup.py install &>/dev/null&& cd - &>/dev/null
+    if [[ $? -eq 0 ]]
+    then
+        #pip
+        sudo tar -xzvf $DIR/rpms/python-related/pip-9.0.3.tar.gz -C /tmp/ &>/dev/null&& cd /tmp/pip-9.0.3 && sudo python setup.py install &>/dev/null && cd - &>/dev/null
+        if [[ $? -eq 0 ]]
+        then
+            #driver
+            sudo pip install $DIR/rpms/python-related/six-1.11.0-py2.py3-none-any.whl $DIR/rpms/python-related/kazoo-2.5.0-py2.py3-none-any.whl &>/dev/null
+            if [[ $? -eq 0 ]]
+            then
+                _log_succ "[2/2] Soft [kazoo] Install : [PASS]"
+              sudo tar -xzvf $DIR/rpms/configparser-3.5.0.tar.gz -C /tmp/ &>/dev/null && cd /tmp/configparser-3.5.0 && sudo python setup.py install &>/dev/null&& cd - &>/dev/null
+                EXECUTE_NEXT_STEP_FLAG=0
+            else
+                EXECUTE_NEXT_STEP_FLAG=1
+                _log_err "[2/2] Soft [kazoo] Install : [FAILED]"
+            fi
+         else
+              _log_err "[2/2] Soft [pip] Install : [FAILED]"
+              EXECUTE_NEXT_STEP_FLAG=1
+        fi
+    else
+         _log_err "[2/2] Soft [Setuptools] Install : [FAILED]"
+         EXECUTE_NEXT_STEP_FLAG=1
+    fi
+}
+function software_install_success
+{
+	_log_succ "Software [$1] Install : [PASS]"
+	EXECUTE_NEXT_STEP_FLAG=0
+}
+function software_install_failed
+{
+	_log_err "Software [$1] Install : [FAILED]"
+	EXECUTE_NEXT_STEP_FLAG=1
+}
+function docker_ce_install
+{
+	_banner_index "Install Docker CE"
+        cat << EOF >/etc/yum.repos.d/uboc.repo
+[uboc]
+name=uboc
+baseurl=file:///$DIR/packages
+enabled=1
+gpgcheck=0
+EOF
+        mkdir -p /$(basename ${DIR})/packages
+        cp -ar $DIR/packages/repodata /$(basename ${DIR})/packages
+        #docker version | grep '18.09' && echo 'pass' || yum install -y $DIR/packages/docker-ce/*.rpm
+        #which docker || yum install -y $DIR/packages/docker-ce/*.rpm
+         which docker || yum install -y docker-ce
+	if [[ $? -eq 0 ]];then
+		systemctl start docker 
+		docker version && software_install_success Docker || software_install_failed Docker
+	else
+		_log_err "Docker CE Install : [FAILED]"
+         EXECUTE_NEXT_STEP_FLAG=1
+	fi
+}
+
+function environment_ready
+{
+	_banner_index " Config environment"
+        echo "HTTP_SERVER=$LOCAL_IP STOR_HOST_IP=$STOR_HOST_IP"
+	ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/uboc.yml --tags=environment,nfs_server,nfs_client --extra-vars="HTTP_SERVER=$LOCAL_IP STOR_HOST_IP=$STOR_HOST_IP NTP_SERVER=$NTP_SERVER" 
+        if [[ $? -eq 0 ]];then
+            _log_succ "Environment+NFS: [PASS]"
+            crudini --set $CONFIG_FILE NFS NFS_RE_INSTALL False
+	    EXECUTE_NEXT_STEP_FLAG=0
+        else
+            _log_err "Environment+NFS: [FAILED]"
+            EXECUTE_NEXT_STEP_FLAG=1
+        fi
+}
+
+function base_driver_initial_action
+{
+    CRUDINI_Check
+    #basic_version_verify
+    if [ $EXECUTE_NEXT_STEP_FLAG -eq 0 ]
+    then   
+        initial
+	docker_ce_install
+        yumrepo_start
+        uboc_distribution_start
+        environment_ready
+        # http_server_config
+        # python_related_install
+    else
+        _log_err "OS Version Check : [FAIL]"
+        EXECUTE_NEXT_STEP_FLAG=1
+        exit 1
+    fi
+}

@@ -1,0 +1,384 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+
+. $DIR/tool
+. $DIR/logs
+
+LOCAL_IP=$(echo $(ip -4 route get '8.8.8.8') | awk '{print $7}')
+##IP
+#echo "LOCAL_IP: "$LOCAL_IP
+#
+##Tags
+#echo "RELEASE_TAGS: "$RELEASE_TAGS
+#
+##logPath
+#echo "logBasePath: "$logBasePath
+#
+##ZK
+#echo "ZK_URL: "$ZK_URL
+
+WORKSPACE=$default_workspace
+
+#echo "WORKSPACE: "$WORKSPACE
+
+function Clean_Pre_Container
+{
+   container_name=${1?"Need Container Name"}
+   container_history=$(docker ps -a)
+   container_source_image=$(docker images | grep $container_name |awk {'print $3'})
+   [[ ! -n $container_history  ]] && echo $container_history | grep $container_name| awk {'print $1'}| xargs sudo docker stop | xargs sudo docker rm  > /dev/null
+   if [ $? -eq 0 ]
+    then
+        #Here Need Clean Local Images
+        [[ ! -n $container_source_image ]] && echo $container_source_image |xargs sudo docker rmi  > /dev/null
+        if [ $? -eq 0 ]
+        then
+            _log_succ "Clean Action : [PASS]"
+        else
+            _log_err "Clean Images : [Fail]"
+        fi
+    else
+        _log_adv $container_name  "Your System Are OK! NO Need Clean Action"
+    fi
+
+}
+
+
+#Here Need Enhance
+#Update register
+function  ensure_registrator_ready
+{
+   container_registrator_status=$(docker ps -a | grep registrator)
+   #no-exist , recreate
+   if [[ ! -n $container_registrator_status  ]]
+   then
+       _log_err "Registrator Status : [NOT Running], New Start Job Starting..."
+       # prepare
+       Common_Log_Prepare registrator
+       # install registrator
+       Install_Necessary_Registrator
+   else
+      #exist , restart
+      #echo $container_registrator_status | awk {}
+       _log_succ "Registrator Status : [Running]"
+       sudo docker restart registrator &>/dev/null
+   fi
+   
+}
+
+
+#Prepare
+function Common_Log_Prepare
+{
+    #echo  "Common Prepare Env"
+    #create logs path
+    #modules_list="application auth config deployer monitor pipeline runtime appstore"
+    modules_type=${1?"M"}
+
+    logPath=${logBasePath}/${modules_type}
+      if [ ! -d "$logPath" ] 
+	  then
+          #echo "Create $logPath"
+          mkdir -p $logPath
+          [ $? -eq 0 ] && _log_succ $modules_type "location ready" || _log_err "Meet Error"
+      fi
+}
+
+#00-Registrator
+function Install_Necessary_Registrator
+{
+    _log_info  "Install Necessary Registrator [0/0]" 
+    sudo docker run -d --restart=always --name=registrator --net=host \
+				--volume=/var/run/docker.sock:/tmp/docker.sock $REGISTRY_URL/gliderlabs/registrator:$RELEASE_TAGS \
+				-ip $LOCAL_IP  \
+				-resync 20 zookeeper://$ZK_URL/boc/modules &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Registrator : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Registrator : [FAILED]" 
+    fi
+	return $FLAG
+}
+
+#01-Auth-9008
+function Install_Devops_Auth
+{
+    ensure_registrator_ready
+    _log_info  "Auth Service Will run on 9008"
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-auth \
+				-p 9008:8080 -v $WORKSPACE/config/auth-config/:/usr/local/tomcat/webapps/devops-auth/WEB-INF/classes/config/ \
+				-v /etc/hosts:/etc/hosts \
+				-v /etc/localtime:/etc/localtime \
+				-v ${logBasePath}/auth:/usr/local/tomcat/logs/ \
+				--restart=always $REGISTRY_URL/devops-auth:$RELEASE_TAGS  &>/dev/null
+
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Auth : [PASS]" 
+    else
+        _log_err "Install Auth : [FAILED]" 
+    fi
+}
+
+#02-Config
+function Install_Devops_Config
+{
+   ensure_registrator_ready
+   _log_info  "Install Devops Config Service"
+   FLAG=1
+   #Cluster Scope 
+	
+   #Single Scope 
+   sudo docker run -itd --restart=always --name=devops-config -P \
+		-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-config/WEB-INF/classes/config/zk.properties  \
+		-v /etc/hosts:/etc/hosts \
+		-v /etc/localtime:/etc/localtime \
+		-v ${logBasePath}/config:/usr/local/tomcat/logs/ \
+		--restart=always $REGISTRY_URL/devops-config:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ] 
+    then
+        _log_succ "Install Config : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Config : [FAILED]" 
+    fi
+	return $FLAG
+	
+}
+
+function Install_Devops_Runtime
+{
+    ensure_registrator_ready
+    echo  "Install Devops Runtime"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-runtime -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-runtime/WEB-INF/classes/config/zk.properties  \
+	-v /etc/hosts:/etc/hosts -v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/runtime:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-runtime:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Runtime : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Runtime : [FAILED]" 
+    fi
+	return $FLAG
+
+}
+
+function Install_Devops_Application
+{
+    ensure_registrator_ready
+    echo  "Install Devops Application"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-application -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-application/WEB-INF/classes/config/zk.properties  \
+	-v /etc/hosts:/etc/hosts -v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/application:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-application:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Application : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Application : [FAILED]" 
+    fi
+	return $FLAG
+
+}
+
+function Install_devops_Deployer
+{
+    ensure_registrator_ready
+    echo  "Install Devops Deployer"
+    FLAG=1
+    sudo docker run -itd --restart=always --name=devops-deployer -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-deployer/WEB-INF/classes/config/zk.properties  \
+	-v /etc/hosts:/etc/hosts \
+	-v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/deployer:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-deployer:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Deployer : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Deployer : [FAILED]" 
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Monitor
+{
+    ensure_registrator_ready
+    echo  "Install Devops Monitor"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-monitor -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-monitor/WEB-INF/classes/config/zk.properties  \
+	-v /etc/hosts:/etc/hosts \
+	-v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/monitor:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-monitor:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Monitor : [PASS]" 
+        FLAG=0
+    else
+        _log_err "Install Monitor : [FAILED]" 
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Pipeline
+{
+    ensure_registrator_ready
+    echo  "Install Devops Pipeline"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-pipeline -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-pipeline/WEB-INF/classes/config/zk.properties \
+	-v /etc/hosts:/etc/hosts \
+	-v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/pipeline:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-pipeline:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Pipeline : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Pipeline : [FAILED]" 
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Appstore
+{
+    ensure_registrator_ready
+    echo "Install Devops Appstore"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    sudo docker run -itd --restart=always --name=devops-appstore -P \
+	-v $WORKSPACE/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-appstore/WEB-INF/classes/config/zk.properties  \
+	-v /etc/localtime:/etc/localtime \
+	-v ${logBasePath}/appstore:/usr/local/tomcat/logs/ \
+	--restart=always $REGISTRY_URL/devops-appstore:$RELEASE_TAGS &>/dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ  "Install Appstore : [PASS]" 
+		FLAG=0
+    else
+        _log_err "Install Appstore : [FAILED]" 
+    fi
+	return $FLAG
+}
+
+
+function start_app_center
+{
+
+    #echo "*********     Welcome To Start Center  *************"
+    #echo "*********     Please Choose Your Type **************"	
+    #echo "*********	Registrator  *************************"
+    #echo "*********	Auth  ********************************"
+    #echo "*********	Config  ******************************"
+    #echo "*********	Runtime  *****************************"
+    #echo "*********	Application  *************************"
+    #echo "*********	Deployer  ****************************"
+    #echo "*********	Monitor  *****************************"
+    #echo "*********	Pipeline  ****************************"
+    #echo "*********	Appstore  ****************************"
+    
+    app_type=${1?"Please Give Your Target...."}
+    echo $app_type > /tmp/22222
+    #read -p "Type You Want." app_type
+        case $app_type in
+            #registrator)
+            #           echo "*********	Registrator  *************************"
+            #           Clean_Pre_Container registrator
+            #           Common_Log_Prepare registrator
+            #           Install_Necessary_Registrator
+            #           ;;
+            Auth)
+                       echo "*********	Auth  ********************************"
+                       Clean_Pre_Container auth
+                       Common_Log_Prepare auth
+                       Install_Devops_Auth
+                       ;;
+            Config)
+                       echo "*********	Config  ******************************"
+                       Clean_Pre_Container config
+                       Common_Log_Prepare config
+                       Install_Devops_Config
+                       ;;
+            Runtime)
+                       echo "*********	Runtime  *****************************"
+                       Clean_Pre_Container runtime
+                       Common_Log_Prepare runtime
+                       Install_Devops_Runtime
+                       ;;
+            Application)
+                       echo "*********	Application  *************************"
+                       Clean_Pre_Container application
+                       Common_Log_Prepare application
+                       Install_Devops_Application
+                       ;;
+            Deployer)
+                       echo "*********	Deployer  ****************************"
+                       Clean_Pre_Container deployer
+                       Common_Log_Prepare deployer
+                       Install_devops_Deployer
+                       ;;
+            Monitor)
+                       echo "*********	Monitor  *****************************"
+                       Clean_Pre_Container monitor
+                       Common_Log_Prepare monitor
+                       Install_Devops_Monitor
+                       ;;
+            Pipeline)
+                       echo "*********	Pipeline  ****************************"
+                       Clean_Pre_Container pipeline
+                       Common_Log_Prepare pipeline
+                       Install_Devops_Pipeline
+                       ;;
+            Appstore)
+                       echo "*********	Appstore  ****************************"
+                       Clean_Pre_Container appstore
+                       Common_Log_Prepare appstore
+                       Install_Devops_Appstore
+                       ;;
+            *)
+                       echo "Error , Re-Check Again"
+                       ;;
+        esac
+}
+
+start_app_center $1

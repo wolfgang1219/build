@@ -1,0 +1,294 @@
+- hosts: PIPLELINE
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Stop firewalld
+      service: name=firewalld state=stopped enabled=no
+
+    - name: Disabled selinux (00-Stop)
+      selinux: state=disabled
+
+    - name: Disabled selinux (01-Diabled)
+      lineinfile:  dest=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled' state=present
+
+    - name: Install Base NFS
+      yum: name=nfs-utils state=latest   
+
+#    - name: Install ntp Software(0)
+#      yum: name=ntp state=latest
+
+#    - name: Update The NTP Configure(1)
+#      lineinfile:  dest=/etc/ntp.conf  regexp='^server.*'  state=absent
+#      when: ansible_default_ipv4.address !=  NTP_SERVER 
+
+#    - name: Update The NTP Configure(2)
+#      shell: echo "server {{ NTP_SERVER }} iburst" >/etc/ntp.conf
+#      when: ansible_default_ipv4.address !=  NTP_SERVER 
+
+#    - name: Enable NTP Service (3)
+#      service: name=ntpd enabled=yes
+
+#    - name: Restart The NTP Service (4)
+#      service: name=ntpd state=restarted
+
+#    - name: Copy Local hosts File
+#      copy: src={{ DIR }}/hosts/hosts dest=/etc/hosts force=yes mode=0644
+
+#    - name: Sync Time (5)
+#      shell: ntpdate -d {{ NTP_SERVER }}
+#      ignore_errors: True
+
+    - name: Copy GCC GCC-C++ Soft
+      copy: src={{ DIR }}/rpms/gcc-rpms dest=/tmp/ mode=0644
+
+    - name: Check GCC
+      shell: gcc --version &>/dev/null
+      register: gcc_status
+      ignore_errors: true
+
+    - name: Install GCC GCC-C++
+      yum: name=gcc state=latest
+      when: gcc_status.rc != 0
+
+    - name: Enable Remote Acess
+      lineinfile:
+        dest: /usr/lib/systemd/system/docker.service
+        state: present
+        regexp: '^ExecStart=/usr/bin/dockerd'
+        line: 'ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock'
+
+    - name: Copy Basic Config (Docker-ce [4/5]) Software
+      copy: src={{ DIR }}/template/daemon.json dest=/etc/docker/daemon.json force=yes mode=0644
+
+    - name: Start Basic (Docker-ce) Service
+      service: name=docker state=restarted 
+
+    - name: Install Related Package
+      yum: name={{ item }} state=latest
+      with_items:
+        - nss-softokn-freebl
+        #- nss-softokn-freebl.i686 
+        #- nss-softokn-freebl-devel 
+    - name: Install Pipeline Soft(Wait For A Mement)
+      yum: name=devops-pipe state=latest
+
+    - name: Disable Mysql Server
+      service: name=mysql enabled=no 
+      ignore_errors: True
+ 
+    # ------------------------------------------
+    - name: Create Directory
+      file: path={{ WORSPACE }}/images state=directory
+
+    - name: Install MySQL database (Copy Image- 0/3)
+      copy: src={{ DIR }}/module/images/mysql.tar dest={{ WORSPACE }}/images  mode=0644
+
+    - name: Load MySQL database (Load Image- 1/3)
+      shell: "docker load < {{ WORSPACE }}/images/mysql.tar"
+
+    - name: Load MySQL database (Create Data Dir - 2/3)
+      file: path=/var/mysql_data/ state=directory  mode=0777
+    - name: check mysql container
+      shell: "docker ps -a -f name=mysql | grep mysql"
+      register: sonar_mysql_run
+      ignore_errors: true
+
+    - name: debug
+      debug: msg="{{sonar_mysql_run}}" 
+    - name: Load MySQL database(Start DB Server- 3/3)
+      #shell: "docker run -p 3306:3306 --restart=always --name mysql -v /var/mysql_data/:/var/lib/mysql -e MYSQL_ROOT_PASSWORD={{ DB_PASS }} -d mysql:5.7.23 --max_connections=4096 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
+      shell: "docker run -p 3306:3306 --restart=always --name mysql -v /var/mysql_data/:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=onceas -d mysql:5.7.23 --max_connections=4096 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
+      register: sonar_mysql_status
+      when: sonar_mysql_run.rc
+    
+    # ------------------------------------------
+
+    #- name: Update Related hosts
+    #  lineinfile: 
+    #      path: /etc/hosts 
+    #      line: '{{ LOCAL_IP }}  sonar-db'
+
+    - name: Update Related hosts (0)
+      lineinfile:
+          path: /etc/hosts
+          line: '{{ CI_HOST }}  sonar-server'
+
+    - name: Update Related hosts (1)
+      lineinfile:
+          path: /etc/hosts
+          line: '{{ CI_HOST }}  jenkins-server'
+
+    - name: Update Related hosts (2)
+      lineinfile:
+          path: /etc/hosts
+          line: '{{ DB_HOST }}  sonar-db'
+
+    - name: Install nodejs Package.
+      yum: name=npm state=latest
+
+    - name: Install Agent Package [0/2]
+      yum: name=devops-serv state=latest
+
+    - name: Start Abcsys Service [1/2]
+      service: name=abcsys state=started enabled=yes 
+
+    - name: Push Latest Tool [2/2]
+      copy: src={{ DIR }}/module/v18/modules/ dest=/abcs/devops-abcsys/v18/modules/ mode=0755
+
+# Add Related Into System Path
+    - name: Check Related System Variable [0/5]
+      shell: cat /etc/profile
+      register: system_result
+
+    - name: Setting Related System Variable [1/5]
+      shell: /bin/echo {{ item }} >> /etc/profile; source /etc/profile
+      when: system_result.stdout.find('JAVA_HOME') == -1
+      with_items:
+         - export JAVA_HOME=/usr/java/jdk1.8.0_144
+         - export JENKINS_HOME=/abcs/jenkins-2.46.3/jenkins
+         - export MAVEN_HOME=/abcs/maven-3.5.0
+         - export ANT_HOME=/abcs/ant-1.10.1
+         - export PATH=\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$ANT_HOME/bin:\$PATH 
+
+    - name: Check Related System Variable (root) [2/5]
+      shell: cat /root/.bashrc
+      register: bashrc_result
+
+    - name:  Setting Related System Variable (root) [3/5]
+      shell: /bin/echo {{ item }} >> /root/.bashrc; source /root/.bashrc
+      when: bashrc_result.stdout.find('JAVA_HOME') == -1
+      with_items:
+         - export JAVA_HOME=/usr/java/jdk1.8.0_144
+         - export JRE_HOME=/usr/java/jdk1.8.0_144
+         - export JENKINS_HOME=/abcs/jenkins-2.46.3/jenkins
+         - export MAVEN_HOME=/abcs/maven-3.5.0
+         - export ANT_HOME=/abcs/ant-1.10.1
+         - export PATH=\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$ANT_HOME/bin:\$PATH
+  
+    - name: Check Related System Variable (no-root) [4/5]
+      shell: cat /home/{{ ansible_env.SUDO_USER }}/.bashrc
+      register: bashrc_result_user
+      ignore_errors: true
+ 
+    - name:  Setting Related System Variable (no root) [5/5]
+      shell: /bin/echo {{ item }} >> /home/{{ ansible_env.SUDO_USER }}/.bashrc; source /home/{{ ansible_env.SUDO_USER }}/.bashrc
+      when: bashrc_result_user.stdout.find('JAVA_HOME') == -1
+      ignore_errors: true
+      with_items:
+         - export JAVA_HOME=/usr/java/jdk1.8.0_144
+         - export JRE_HOME=/usr/java/jdk1.8.0_144
+         - export JENKINS_HOME=/abcs/jenkins-2.46.3/jenkins
+         - export MAVEN_HOME=/abcs/maven-3.5.0
+         - export ANT_HOME=/abcs/ant-1.10.1
+         - export PATH=\$JAVA_HOME/bin:\$MAVEN_HOME/bin:\$ANT_HOME/bin:\$PATH
+
+ 
+    - name: Seting Ant Execute Permission
+      shell: 'chmod +x /abcs/ant-1.10.1/bin/ant'
+
+# Here Need Enhancement.
+    - name: Create Related Directory [0/3]
+      file: path=/abcs/sonar state=directory
+
+    - name: Copy SonarQube Related  Scripts [1/3]
+      copy: src={{ DIR }}/template/devops-pipe/pipe_mysql_installer/resources/sonar/sonar-mysql.sql dest=/abcs/sonar/ mode=0644
+    - name: wait mysql ready
+      wait_for: timeout=15
+    - name: Initial SonarQube related database [2/3]
+      shell: 'mysql -h{{ DB_HOST }} -u{{ DB_USER}} -p{{ DB_PASS }} -e "CREATE DATABASE sonar character set utf8;"'
+      when: sonar_mysql_status.changed == true
+      ignore_errors: True
+      register: sonar_db_status
+
+    - name: Initial SonarQube related database [3/3]
+      shell: 'mysql -h{{ DB_HOST }} -u{{ DB_USER }} -p{{ DB_PASS }} -Dsonar -e "$(cat /abcs/sonar/sonar-mysql.sql)"'
+      ignore_errors: True
+      #when: sonar_db_status.changed == true
+
+# Clari Related
+    - name: Load Clari Related Docker Images [1/3]
+      shell: 'docker load < /abcs/clair/clairwithpostgres.tar'
+
+    - name: Copy Related File [Scanner]
+      copy: src={{ DIR }}/template/clair/scanner dest=/usr/bin/ force=yes mode=0755
+
+    - name: Check Docker-compose Status [2/3]
+      shell: 'docker-compose -version'
+      register: docker_compose_version
+
+    - name: Start SonarQube Service
+      shell: '/abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh restart'
+ 
+    - name: Copy Related Trigger Tool
+      copy: src={{ DIR }}/module/start_tomcat.sh dest=/abcs/jenkins-2.46.3/ mode=777
+ 
+    - name: Start  Jenkins Service
+      become_user: root
+      shell: 'nohup /abcs/jenkins-2.46.3/start_tomcat.sh &'
+      register: jenkins_out
+ 
+    #- name: Start Jenkins Server
+    #  become_user: root
+    #  shell: 'nohup /abcs/jenkins-2.46.3/bin/startup.sh &'
+    #  register: jenkins_out
+      
+    - name: Check Status 
+      debug: var=jenkins_out.stdout verbosity=0
+
+    - name: Enable Boot At Power On [0/3]
+      shell: 'chmod +x /etc/rc.d/rc.local'
+
+    - name: Enable Boot At Power On [1/3]
+      lineinfile:
+          path: /etc/rc.d/rc.local
+          line: source /etc/profile
+
+    - name: Enable Boot At Power On [2/3]
+      lineinfile:
+          path: /etc/rc.d/rc.local
+          line: bash /abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh start
+
+    - name: Enable Boot At Power On [3/3]
+      lineinfile:
+          path: /etc/rc.d/rc.local
+          line: bash /abcs/jenkins-2.46.3/bin/startup.sh
+    - name: cleanup(1/2)
+      file: path=/usr/lib/systemd/system/mariadb.service state=absent
+
+    - name: cleanup(2/2)
+      file: path=/etc/rc.d/init.d/mysql state=absent  
+    # - name: Add System Path
+      
+    #- name: Copy Scanner Script
+    #  copy: src={{ DIR }}/template/clair/scanner dest=/usr/bin/ force=yes mode=0755
+
+    #- name: Copy Docker-Compose Script
+    #  copy: src={{ DIR }}/template/clair/docker-compose dest=/usr/bin/ force=yes mode=0755
+
+    #- name: Copy Clair Related Configure File(0)
+    #  copy: src={{ DIR }}/template/clair/docker-compose.yml dest={{ WORSPACE }}/ force=yes mode=0644
+
+    #- name: Copy Clair Related Configure File(1)
+    #  copy: src={{ DIR }}/template/devops-pipe dest=/abcs/
+
+    #- name: Initial Pipeline
+    #  shell: 'sh  /abcs/devops-pipe/init-pipeline'
+
+    #- name: Start Pipeline
+    #  shell: 'sh /abcs/devops-pipe/start-pipeline'
+    
+    #- name: Update Repo File(0/2-Clean Tmp File)
+    #  file: path=/etc/yum.repos.d/boc1.8.repo state=absent
+
+    #- name: Update Repo(1/2-Recovery)
+    #  shell: mv /etc/yum.repos.d/bak/*.repo /etc/yum.repos.d/
+
+    #- name: Update Repo(2/2-Back )
+    #  file: path=/etc/yum.repos.d/bak state=absent
+
+    #- name: Clean Tmp Repo
+    #  file: path=/etc/yum.repos.d/boc1.8.repo state=absent
+#Here Need abcsys-agent

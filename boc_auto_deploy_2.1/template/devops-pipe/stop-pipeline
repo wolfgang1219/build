@@ -1,0 +1,30 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: wuheng@{otcaix.iscas.ac.cn, beyondcent.com}
+## Date  : 2017/8/10
+##
+#####################################################
+
+
+if [[ -z $1 ]]
+then
+    echo "Stop Sonar"
+    bash /abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh stop
+    echo "Stop Jenkins"
+    bash /abcs/jenkins-2.46.3/bin/shutdown.sh
+elif [[ $1 = "sonar" ]]
+then
+    echo "Stop Sonar"
+    bash /abcs/sonarqube-6.3.1/bin/linux-x86-64/sonar.sh stop
+elif [[ $1 = "jenkins" ]]
+then
+    echo "Stop Jenkins"
+    bash /abcs/jenkins-2.46.3/bin/shutdown.sh
+else 
+    echo "Usage stop-pipe [params]"
+    echo "param can be null, sonar and jenkins"
+fi
+

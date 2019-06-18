@@ -1,0 +1,3 @@
+---
+mariadb_release: 10.2
+xtrabackup: false

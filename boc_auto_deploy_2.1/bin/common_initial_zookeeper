@@ -1,0 +1,53 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+. $DIR/bin/tool
+. $DIR/bin/logs
+#. $DIR/bin/common_initial_database
+
+
+CONFIG_FILE=$DIR/config/Common.conf
+
+client_port=$(crudini --get $CONFIG_FILE ZK zk_port)
+zk_action=$(crudini --get $CONFIG_FILE ZK ZK_RE_INSTALL)
+zk_action="False"
+function common_initial_zookeeper_action
+{
+     if [[ $zk_action == "True" || $zk_action == "true" ]]
+     then
+         #ansible-playbook -i $DIR/hosts/common_inventory_hosts  $DIR/module/prepare_zookeeper.yaml --extra-vars="DIR=$DIR NTP_SERVER=$NTP_SERVER  myid=$RANDOM client_port=$client_port default_workspace=$default_workspace zk_hosts=$ZK_HOSTS"
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts  $DIR/module/template/zookeeper/prepare_zookeeper.yaml --extra-vars="DIR=$DIR NTP_SERVER=$NTP_SERVER  myid=$RANDOM client_port=$client_port default_workspace=$default_workspace "
+         if [[ $? -eq 0 ]]
+         then
+              crudini --set $CONFIG_FILE ZK ZK_RE_INSTALL False > /dev/null
+              _log_succ "Zookeeper Install Action : [PASS]"
+              
+              #Data Inject
+              sleep 5
+              python $DIR/bin/ZKTool.py &>/dev/null
+              if [[ $? -eq 0 ]]
+              then
+                  EXECUTE_NEXT_STEP_FLAG=0
+                  _log_succ "Zookeeper Initial Data Inject Action : [PASS]"
+              else
+                  EXECUTE_NEXT_STEP_FLAG=1
+                  _log_err "Zookeeper Initial Data Inject Action : [Fail]"
+                  
+              fi
+         else
+              EXECUTE_NEXT_STEP_FLAG=1
+              _log_err "Zookeeper Install Action : [FAIL]"
+         fi
+     else
+        _log_warn "Zookeeper Do not Re-install"
+     fi
+
+}

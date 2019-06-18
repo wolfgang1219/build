@@ -1,0 +1,11 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy paas web Container Related File(1/1)
+  template: src=paas_web.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_web.sh mode=0755
+
+- name: Copy web config file
+  template: src=paas-web.conf.j2  dest={{ DEFAULT_WORKSPACE }}/docker/paas-web.conf mode=0755
+
+- name: Start web Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_web.sh"

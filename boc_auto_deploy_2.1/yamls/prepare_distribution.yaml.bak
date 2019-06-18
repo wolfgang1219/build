@@ -1,0 +1,160 @@
+- hosts: REGISTRY
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Stop firewalld
+      service: name=firewalld state=stopped enabled=no
+
+    - name: Disabled selinux (00-Stop)
+      selinux: state=disabled
+
+    - name: Disabled selinux (01-Diabled)
+      lineinfile:  dest=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled' state=present
+     
+    - name: Update Repo(0/2)
+      file: path=/etc/yum.repos.d state=absent
+
+    - name: Update Repo(1/2)
+      file: path=/etc/yum.repos.d state=directory
+
+    - name: Update Repo(2/2)
+      copy: src={{ DIR }}/template/boc1.8.repo dest=/etc/yum.repos.d/boc1.8.repo force=yes mode=0644
+
+    - name: Install NTP Server(0)    
+      yum: name=ntp state=latest
+
+    - name: Enable NTP Service(1)
+      service: name=ntpd enabled=yes
+    
+    - name: Start NTP Service(2)
+      service: name=ntpd state=started
+
+    - name: Update The NTP Configure(3)
+      lineinfile:  dest=/etc/ntp.conf  regexp='^server.*'  state=absent
+     
+    - name: Update The NTP Configure(4)
+      lineinfile: dest=/etc/ntp.conf line="server  127.127.1.0" 
+
+    - name: Update The NTP Configure(5)
+      lineinfile: dest=/etc/ntp.conf line="fudge   127.127.1.0 stratum 10"
+
+    - name: Start NTP Service(4)
+      service: name=ntpd state=restarted
+
+    # Here Need Support HA
+    - name: Verify Keepalived Install Status
+      shell: keepalived -version &> /dev/null
+      register: keepalived_status
+      ignore_errors: true
+
+    - name: Check Verify HA Action [1/2]
+      yum: name=keepalived state=latest
+      when: (ansible_default_ipv4.address != VIP) and (keepalived_status.rc != 0)
+
+    - name: Update HA COnfigure [2/2]
+      copy: src={{ DIR }}/module/template/keepalived.conf dest=/etc/keepalived/keepalived.conf mode=0644
+      when: ansible_default_ipv4.address != VIP and keepalived_status.rc != 0
+    #------------------------------
+    #- name: Install Dist Related Soft [1/3]
+    #  yum: name=devops-dist state=latest
+   
+    #- name: Copy Related Distribution File
+    #  copy: src={{ DIR }}module/template/distribution/docker_distribution.sh dest={{ WORKSPACE }}/ force=yes mode=0755
+    #- name: Enable docker-distribution [2/3] Service
+    #  service: name=docker-distribution enabled=yes
+
+    #- name: Start docker-distribution [3/3] Service
+    #  service: name=docker-distribution state=started    
+
+    #- name: Install Dist Related Soft [0/2]
+    #  yum: name=devops-serv state=latest
+
+    - name: Push Latest Tool [1/2]
+      copy: src={{ DIR }}/module/v18/modules/ dest=/abcs/devops-abcsys/v18/modules/ mode=0755
+    
+    - name: Start & Enable Agent [2/2]
+      service: name=abcsys state=started enabled=yes
+
+    - name: Install Docker Soft
+      yum: name=docker-ce state=latest
+    
+    - name: Enable Basic (Docker-ce [2/5]) Service
+      service: name=docker enabled=yes
+
+    - name: Restart Basic (Docker-ce [3/5]) Service
+      service: name=docker state=restarted
+    
+    - name: Copy Basic Config (Docker-ce [4/5]) Software
+      copy: src={{ DIR }}/template/daemon.json dest=/etc/docker/daemon.json force=yes mode=0644
+    
+    - name: Restart Basic (Docker-ce [5/5]) Service
+      service: name=docker state=restarted
+
+    - name: Copy Local hosts File
+      copy: src={{ DIR }}/hosts/hosts dest=/etc/hosts force=yes mode=0644
+
+    - name: Create Docker-Distribution Related Directory
+      file: path=/var/lib/registry state=directory
+
+    - name: Copy Docker Distribution Config File
+      copy: src={{ DIR }}/bin/tool dest={{ WORKSPACE }}/docker/ mode=0755
+
+    - name: Copy run docker-distribution shell script
+      copy: src={{ DIR }}/module/template/distribution/docker_distribution.sh dest={{ WORKSPACE }}/docker/docker_distribution.sh mode=0755
+
+    - name: Copy Docker-Distribution Image
+      copy: src={{ DIR }}/module/docker-distribution.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644 
+    - name: Start docker distribution Container Instance
+      shell: "{{ WORKSPACE }}/docker/docker_distribution.sh"
+      register: distribution_container_status
+   
+
+    - name: Create Target Direatory
+      file: path={{ WORKSPACE }}/config  state=directory
+
+    - name: Create Target Direatory
+      file: path={{ WORKSPACE }}/bin  state=directory
+
+    - name: Copy Basic Source Images(0/2)
+      copy: src={{ DIR }}/images dest={{ WORKSPACE }}/ force=yes mode=0644
+
+    #---------------------------------------
+    - name: Copy Basic Source Images(1/2)
+      copy: src={{ DIR }}/module/images/devops-registrator.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+    - name: Copy Basic Source Images(2/2)
+      copy: src={{ DIR }}/module/images/component.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+    - name: Copy Basic Source Images(2/2)
+      copy: src={{ DIR }}/module/images/component.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+
+    - name: Copy Basic Source Images(2/2)
+      copy: src={{ DIR }}/module/images/component.tar  dest={{ WORKSPACE }}/images/ force=yes mode=0644
+    
+    #--------------------------------
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/common_initial_images dest={{ WORKSPACE }}/bin/common_initial_images force=yes mode=0755
+
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/tool dest={{ WORKSPACE }}/bin/tool force=yes mode=0644
+
+    - name: Copy Related Configuration File
+      copy: src={{ DIR }}/bin/logs dest={{ WORKSPACE }}/bin/logs force=yes mode=0644
+
+    - name: Update Distribution Images[1/3-import]
+      shell:  '{{ WORKSPACE }}/bin/common_initial_images import'
+
+    - name: Update Distribution Images[2/3-update]
+      shell:  '{{ WORKSPACE }}/bin/common_initial_images update'
+
+    - name: Update Distribution Images[3/3-push]
+      shell:  '/bin/bash {{ WORKSPACE }}/bin/common_initial_images push'
+      register: image_action_out
+   
+    - name: Show Images Result
+      debug: var=image_action_out.stdout verbosity=0
+
+    #Here Need Clean-up Action

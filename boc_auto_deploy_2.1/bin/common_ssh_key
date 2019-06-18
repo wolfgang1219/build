@@ -1,0 +1,96 @@
+#!/bin/bash
+#DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+. $DIR/bin/logs
+
+STEP_FLAG=1
+
+#prepare
+function generate_ssh_key
+{
+        _banner_index "Generate SSH Key"
+        #check existing or not
+        if [ ! -f ~/.ssh/id_rsa.pub ]
+	then
+                #expect 
+                install_expect
+
+        	#generate key
+		expect $DIR/bin/common-expect
+		
+                _log_info "Key Generate Action Finished"
+        else
+                _log_info "Key is Ready!"
+
+        fi
+
+}
+
+#Prepare(Check) The Cluster Healthy Status
+function prepare_basic_check
+{
+	 _banner_index "Prepare Basic TestBed Check"
+	count=0
+	for i in `cat $DIR/config/Common.conf|grep '^[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}'|sort | uniq|awk {'print $1'}`
+		do 
+			out=$(ping -c 1 $i |grep "100% packet loss"|wc -l)
+			if [[ $out -eq 0 ]]
+			then
+				echo "Host [ $i ] is OK"
+			else
+				echo "Host [ $i ] Not Avaliable!!,Please double check!"
+				let count=count+1
+			fi
+			
+		done
+	echo "Unavaliable Hosts Count is : [ $count ] " 
+
+	if [[ $count -eq 0 ]]
+	then
+		_log_succ "prepare_basic_check : PASS"
+		STEP_FLAG=0
+	else
+		_log_err "prepare_basic_check: Fail"
+	fi
+}
+
+function install_expect
+{
+    expect -version &> /dev/null
+    if [ $? -ne 0 ]
+    then
+        echo "expect will be installed soon"
+        sudo rpm -Uvh $DIR/rpms/expect-rpms/* --force &>/dev/null
+    else 
+        echo "expect is already installed!"
+    fi
+}
+
+
+function dispatch_key
+{
+	_banner_index "Dispatch Related SSH-Key"
+        host_user=$(crudini --get $DIR/config/Common.conf DEFAULT BASE_USER)
+        host_user_pass=$(crudini --get $DIR/config/Common.conf  DEFAULT BASE_PASSWD)
+        SSH='ssh-copy-id -i'
+        HOME_DIR=`cd ~ && pwd`
+        KEYSTORE=$HOME_DIR/.ssh/id_rsa.pub
+        for i in  `cat /etc/hosts | grep -v ^$|awk {'print $1'}`
+        do
+            expect -c "
+                    spawn $SSH $KEYSTORE $host_user@$i
+                    expect {
+                           \"*yes/no*\" {send \"yes\r\"; exp_continue}
+                           \"*password*\" {send \"$host_user_pass\r\"; exp_continue}
+                           \"*Password*\" {send \"$host_user_pass\r\";}
+                           }"
+        done
+}
+
+function common_ssh_key_action
+{
+	generate_ssh_key
+        prepare_basic_check
+
+}
+

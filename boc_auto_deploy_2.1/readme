@@ -1,0 +1,8 @@
+替换sql
+
+1. /home/build/boc_auto_deploy_2.1/yamls/roles/galera_bootstrap/files/sql
+2. /home/build/boc_auto_deploy_2.1/yamls/roles/mariadb_docker/files/sql
+
+更改consul
+
+1.  /home/build/boc_auto_deploy_2.1/yamls/roles/ansible-consul/templates/consul_kv.json.j2  

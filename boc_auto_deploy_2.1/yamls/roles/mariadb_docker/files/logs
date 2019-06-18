@@ -1,0 +1,104 @@
+#!/usr/bin/bash
+####################################################
+##
+## Copyright (2018, ) Gemini.Chen
+##
+## Author: gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+# log functions
+GREEN="\033[32m"
+RED="\033[31m"
+YELLOW="\033[43;31m"
+WGBC="\033[47;30m"
+ENDC="\033[0m\n\c"
+
+function _usage
+{
+    echo -e "Usage:\n$0 -f configure_file [ -s step1,step2,... | ]"
+
+    return 1
+}
+
+function _banner
+{
+    typeset banner="${1?'Banner required'}"
+    typeset bar=$(echo "$banner" | sed 's/./=/g')
+    typeset blank=$(echo "$banner" | sed 's/./ /g')
+
+    echo "  .${bar}."
+    echo "  |${blank}|"
+    echo "  |${banner}|"
+    echo "  |${blank}|"
+    echo "  \`${bar}'"
+
+    return 0
+}
+
+function _banner_index
+{
+    typeset banner="${1?'Banner required'}"
+    typeset bar=$(echo "$banner" | sed 's/./-/g')
+    typeset blank=$(echo "$banner" | sed 's/./ /g')
+
+    echo "  .${bar}."
+    echo "  |${blank}|"
+    echo "  |${banner}|"
+    echo "  |${blank}|"
+    echo "  \`${bar}'"
+
+    return 0
+}
+
+
+function _log_succ
+{
+    typeset message=${1?"need messages"}
+
+    echo -e "${GREEN}${message}${ENDC}"
+    echo -e "\033[0m\c"
+    
+    return 0
+}
+
+function _log_err
+{
+    typeset message=${1?"need messages"}
+
+    echo -e "${RED}${message}${ENDC}"
+    echo -e "\033[0m\c"
+
+    return 1
+}
+
+function _log_warn
+{
+    typeset message=${1?"need messages"}
+    echo -e "${YELLOW}${message}${ENDC}"
+    echo -e "\033[0m\c"
+
+    return 1
+}
+
+function _log_info
+{
+    typeset message=${1?"need messages"}
+    echo -e "${WGBC}${message}${ENDC}"
+    echo -e "\033[0m\c"
+
+    return 0
+}
+
+function _log_adv
+{
+	typeset title=${1?"need Suggestion"}
+	typeset message=${2?"need Suggestion"}
+	_banner_index $title
+	echo -e "Suggestion: ${GREEN}${message}${ENDC}"
+    	echo -e "\033[0m\c"
+
+	return 0
+}

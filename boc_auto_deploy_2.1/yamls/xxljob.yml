@@ -1,0 +1,6 @@
+- hosts: XXLJOB
+  become: true
+  roles:
+    - xxljob_docker
+  tags:
+    - xxljob

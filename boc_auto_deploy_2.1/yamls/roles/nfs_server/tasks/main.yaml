@@ -1,0 +1,80 @@
+---
+  - name: install nfs-utils from uboc repo
+    yum:
+      name: nfs-utils
+      enablerepo: uboc
+      state: present
+
+#  - name: remove old /opt/share
+#    file:
+#      path: /opt/share
+#      state: absent
+
+  - name: mkdir /opt/share
+    file:
+      dest: /opt/share
+      mode: 0777
+      owner: root
+      group: root
+      state: directory
+
+  - name: modify nfs config
+    raw: echo "/opt/share *(rw,sync,no_root_squash,no_subtree_check,insecure)"  > /etc/exports 
+
+  - name: start nfs server
+    service:
+      name: nfs
+      state: restarted
+      enabled: yes
+    with_items:
+      - nfs
+      - nfs-server
+
+  - name: exportfs -r
+    raw: exportfs -r
+
+  - name: showmount -e
+    raw: showmount -e
+    ignore_errors: true
+
+  - name: mkdir /opt/share/image
+    file:
+      dest: /opt/share/image
+      mode: 0755
+      owner: root
+      group: root
+      state: directory
+      
+  - name: copy /opt/share/helm
+    copy:
+      src: helm
+      dest: /opt/share
+      mode: 0755
+      owner: root
+      group: root
+      
+  - name: mkdir /opt/share/package
+    file:
+      dest: /opt/share/package
+      mode: 0755
+      owner: root
+      group: root
+      state: directory
+      
+  - name: mkdir /opt/share/license
+    file:
+      dest: /opt/share/license
+      mode: 0755
+      owner: root
+      group: root
+      state: directory
+      
+  - name: copy /opt/share/logo
+    copy:
+      src: logo
+      dest: /opt/share/
+      mode: 0755
+      owner: root
+      group: root
+  - name: copy duoyinzi_pinyin.txt
+    copy: src=duoyinzi_pinyin.txt dest=/opt/share mode=0755 

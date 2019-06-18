@@ -1,0 +1,14 @@
+server_port: 9002
+data_prefix: nacha_deployer
+systemconfig:
+  upms: http://paas-basic-upms/
+  deployer: http://paas-deployer/
+  monitor: http://paas-monitor/
+  runtime: http://paas-runtime/
+  worker: http://bocloud-worker/
+  apolloPortalPort: 50002 
+  apolloMetaPort: 50000
+  resourceSwitch: false
+  systemNamespaces: kube-public,kube-system,default
+  appCpuThreshold: 0.9
+  appMemThreshold: 0.9

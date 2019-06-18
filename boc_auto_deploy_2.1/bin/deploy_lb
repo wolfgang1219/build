@@ -1,0 +1,49 @@
+#!/bin/bash
+. $DIR/bin/tool
+. $DIR/bin/logs
+CONFIG_FILE=$DIR/config/Common.conf
+
+ACTION_FLAG=$(crudini --get $CONFIG_FILE LB HA_LB_RE_INSTALL)
+
+function deploy_lb
+{
+    _banner_index "Install Haproxy Keepalived"
+    if [[ "$ACTION_FLAG" == "True" || "$ACTION_FLAG" == "true" ]];then
+         hostscnt=$(ansible -i $DIR/hosts/common_inventory_hosts LB --list-hosts | wc -l)
+         if [[ $hostscnt == 3  ]];then
+             mariadb="["
+             serialnum=1
+             for hx in ${DB_HOST//,/ };do
+               mariadb=$mariadb"{'name':'db$serialnum','ip':$hx},"
+               let serialnum=serialnum+1
+             done
+             mariadb=$mariadb"]"
+             paas_web="["
+             serialnum=1
+             for hx in ${PAAS_WEB_IP//,/ };do
+               paas_web=$paas_web"{'name':'web$serialnum','ip':$hx},"
+               let serialnum=serialnum+1
+             done
+             paas_web=$paas_web"]"
+             ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/lb.yml -e "{'mariadb_balancing_servers':$mariadb}" -e "{'web_balancing_servers':$paas_web}" \
+                  --extra-vars="DEFAULT_WORKSPACE=$default_workspace DB_PORT=$DB_PORT  keepalived_vip=$HA_LB_VIP"
+             #ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/lb.yml \
+             #    --extra-vars="DEFAULT_WORKSPACE=$default_workspace keepalived_vip=$HA_LB_VIP haproxy_balancing_servers=$paas_web mariadb_balancing_servers=$mariadb"
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+            _log_err "Haproxy-Keepalived IP: Invalid IP setting"
+            exit 1 
+         fi
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE LB HA_LB_RE_INSTALL False
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install Haproxy-Keepalived:PASS "
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}
+

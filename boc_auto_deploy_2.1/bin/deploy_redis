@@ -1,0 +1,27 @@
+#!/bin/bash
+. $DIR/bin/tool
+. $DIR/bin/logs
+CONFIG_FILE=$DIR/config/Common.conf
+
+ACTION_FLAG=$(crudini --get $CONFIG_FILE REDIS REDIS_RE_INSTALL)
+
+function deploy_redis
+{
+    _banner_index "Install Redis"
+    if [[ "$ACTION_FLAG" == "True" || "$ACTION_FLAG" == "true" ]];then
+         echo "DEFAULT_WORKSPACE=$default_workspace REDIS_HOSTS=\"$REDIS_HOSTS\"  REDIS_IP=$REDIS_HOST REDIS_PORT=${REDIS_PORT:-7061} REDIS_PASS=$REDIS_PASS"
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/uboc.yml --tags=redis_docker \
+             --extra-vars="DEFAULT_WORKSPACE=$default_workspace REDIS_HOSTS=\"$REDIS_HOSTS\"  REDIS_IP=$REDIS_HOST REDIS_PORT=${REDIS_PORT:-7061} REDIS_PASS=$REDIS_PASS"
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE REDIS REDIS_RE_INSTALL False
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install Redis:PASS "
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}
+

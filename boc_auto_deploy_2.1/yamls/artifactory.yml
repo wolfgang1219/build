@@ -1,0 +1,6 @@
+- hosts: ARTIFACTORY
+  become: true
+  roles:
+    - paas_artifactory
+  tags:
+    - paas_artifactory

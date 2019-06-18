@@ -1,0 +1,28 @@
+- name: install nfs-utils from uboc repo
+  yum:
+    name: nfs-utils
+    enablerepo: uboc
+    state: present
+    
+- name: mkdir /abcsys/upload
+  file:
+    dest: /abcsys/upload
+    mode: 0755
+    owner: root
+    group: root
+    state: directory
+
+- name: unmount
+  shell: umount /abcsys/upload
+  ignore_errors: yes
+
+- name: remove mount
+  lineinfile: path=/etc/fstab state=absent regexp='/abcsys/upload nfs'
+  ignore_errors: yes  
+
+- name: config fstab
+  shell: echo "{{ STOR_HOST_IP }}:/opt/share /abcsys/upload nfs defaults 0 0" >> /etc/fstab
+
+- name: mount nfs
+  shell: mount -a
+  ignore_errors: yes

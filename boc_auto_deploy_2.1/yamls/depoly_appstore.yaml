@@ -1,0 +1,6 @@
+- hosts: devops_appstore_ip
+  user: root
+  gather_facts: yes
+  tasks:
+    - name: Run CAAS
+      command: sh {{ DIR }}/bin/run_portal {{ APP_TYPE }}

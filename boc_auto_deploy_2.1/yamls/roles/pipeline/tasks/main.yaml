@@ -1,0 +1,79 @@
+- name: Install Base NFS
+  yum: name=nfs-utils state=latest
+
+- name: Copy GCC GCC-C++ Soft
+  copy: src={{ DIR }}/rpms/gcc-rpms dest=/tmp/ mode=0644
+
+- name: Check GCC
+  shell: gcc --version &>/dev/null
+  register: gcc_status
+  ignore_errors: true
+
+- name: Install GCC GCC-C++
+  shell: chdir=/tmp/gcc-rpms rpm -Uvh *.rpm &>/dev/null
+  when: gcc_status.rc != 0
+
+- name: Install Related Package
+  yum: name={{ item }} state=latest
+  with_items:
+    - nss-softokn-freebl
+    - nss-softokn-freebl.i686
+    - nss-softokn-freebl-devel.i686
+
+- name: Install Pipeline Soft(Wait For A Mement)
+  yum: name=devops-pipe state=latest
+
+- name: Disable Mysql Server
+  service: name=mysql enabled=no
+  ignore_errors: True
+
+- name: Create Directory
+  file: path={{ WORSPACE }}/images state=directory
+
+- name: Install MySQL database (Copy Image- 0/3)
+  copy: src={{ DIR }}/module/images/mysql.tar dest={{ WORSPACE }}/images  mode=0644
+
+- name: Load MySQL database (Load Image- 1/3)
+  shell: "docker load < {{ WORSPACE }}/images/mysql.tar"
+
+- name: Load MySQL database (Create Data Dir - 2/3)
+  file: path=/var/mysql_data/ state=directory  mode=0777
+
+- name: Load MySQL database(Start DB Server- 3/3)
+  shell: "docker run -p 3306:3306 --restart=always --name mysql -v /var/mysql_data/:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=onceas -d mysql:5.7.23 --max_connections=4096 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
+  register: sonar_mysql_status
+
+- name: Update Related hosts (0)
+  lineinfile:
+    path: /etc/hosts
+    line: '{{ CI_HOST }}  sonar-server'
+
+- name: Update Related hosts (1)
+  lineinfile:
+    path: /etc/hosts
+    line: '{{ CI_HOST }}  jenkins-server'
+
+- name: Update Related hosts (2)
+  lineinfile:
+    path: /etc/hosts
+    line: '{{ DB_HOST }}  sonar-db'
+
+- name: Install nodejs Package.
+  yum: name=npm state=latest
+
+- name: Install Agent Package [0/2]
+  yum: name=devops-serv state=latest
+- name: Start Abcsys Service [1/2]
+  service: name=abcsys state=started enabled=yes
+
+- name: Push Latest Tool [2/2]
+  copy: src={{ DIR }}/module/v18/modules/ dest=/abcs/devops-abcsys/v18/modules/ mode=0755
+
+- name: cleanup(1/2)
+  file: path=/usr/lib/systemd/system/mariadb.service state=absent
+
+- name: cleanup(2/2)
+  file: path=/etc/rc.d/init.d/mysql state=absent
+
+- name: ntp cleanup
+  yum: name=ntp state=absent

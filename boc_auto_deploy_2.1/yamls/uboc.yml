@@ -1,0 +1,58 @@
+---
+
+- hosts: ENV
+  become: true
+  roles:
+    - environment
+  tags:
+    - environment
+
+- hosts: DB
+  become: true
+  roles:
+    - mariadb_docker
+  tags:
+    - mariadb_docker
+
+- hosts: NFS
+  become: true
+  roles:
+    - nfs_server
+  tags:
+    - nfs_server
+
+- hosts: WORKER:GATEWAY:PIPLELINE:paas_*
+  become: true
+  roles:
+    - nfs_client
+  tags:
+    - nfs_client
+
+- hosts: CONSUL
+  become: true
+  roles:
+    - {role: ansible-consul}
+  tags:
+    - consul
+
+- hosts: MQ
+  become: yes
+  become_user: root
+  roles:
+    - rabbitmq-cluster
+  tags:
+    - mq-cluster
+
+- hosts: MQ
+  become: true
+  roles:
+    - mq_docker
+  tags:
+    - mq_docker
+
+- hosts: REDIS
+  become: true
+  roles:
+    - redis_docker
+  tags:
+    - redis_docker 

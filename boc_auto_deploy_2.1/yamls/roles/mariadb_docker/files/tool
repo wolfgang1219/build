@@ -1,0 +1,11 @@
+export REGISTRY_URL=:5000
+export RELEASE_TAGS=1.9.0
+export logBasePath=/var/log/boc
+export default_workspace=/opt/deploy
+export NTP_SERVER=192.168.2.200
+export ZK_HOSTS=192.168.1.88
+export ZK_PORT=2181
+export ZK_URL=192.168.1.88:2181
+export SQL_USER=bocloud
+export SQL_PASS=a@!#123
+export SQL_PORT=3316

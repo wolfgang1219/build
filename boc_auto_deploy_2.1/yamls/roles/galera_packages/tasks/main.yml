@@ -1,0 +1,33 @@
+---
+- name: Install MariaDB server packages
+  yum: name={{ item }} state=present enablerepo=uboc disable_gpg_check=yes
+  with_items:
+    - MariaDB-client
+    - MariaDB-server
+    - galera
+- name: x
+  debug: msg="{{mariadb_release | version_compare('10.2', '<')}}"
+
+- name: Install percona-xtrabackup packages
+  yum: name={{ item }} state=present
+  with_items:
+    - percona-xtrabackup
+    - socat
+  when: 
+    - xtrabackup 
+    - "mariadb_release | version_compare('10.2', '<')"
+
+- name: Install percona-xtrabackup-24 packages
+  yum: name={{ item }} state=present enablerepo=uboc disable_gpg_check=yes
+  with_items:
+    - percona-xtrabackup-24
+    - socat
+  when: 
+    - xtrabackup
+    - "mariadb_release | version_compare('10.2', '>=')"
+
+- name: Install MySQL-python
+  yum: name=MySQL-python state=present enablerepo=uboc disable_gpg_check=yes
+
+- name: Add galera configuration
+  template: src=server.cnf.j2 dest=/etc/my.cnf.d/server.cnf owner=root group=root mode=0644

@@ -1,0 +1,24 @@
+server_port: 9007
+data_prefix: nacha_pipeline
+
+jenkins:
+  url: http://{{PIPE_LINE_IP}}:8080/jenkins
+  user: {{CI_USER}}
+  pwd: {{CI_PASS}}
+  strategy:
+    numToKeep: 21
+    daysToKeep: 5
+  workspace: /abcs/jenkins-2.46.3/jenkins/workspace/
+  host:
+    ip: {{PIPE_LINE_IP}}
+    user: {{CI_HOST_USER}}
+    pwd: {{CI_HOST_PASS}}
+systemconfig:
+  runtime: http://paas-runtime/
+  deployer: http://paas-deployer/
+  application: http://paas-application/
+  upms: http://paas-basic-upms/
+  system_title: PaaS平台
+mybatis-plus:
+  mapper-locations: classpath:mapping/*.xml
+  typeAliasesPackage: cn.abcsys.cloud.devops.pipeline.entity

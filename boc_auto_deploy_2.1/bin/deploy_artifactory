@@ -1,0 +1,25 @@
+#!/bin/bash
+. $DIR/bin/tool
+. $DIR/bin/logs
+CONFIG_FILE=$DIR/config/Common.conf
+
+ACTION_FLAG=$(crudini --get $CONFIG_FILE ARTIFACTORY  ARTIFACTORY_RE_INSTALL)
+
+function deploy_artifactory
+{
+    _banner_index "Install ARTIFACTORY"
+    if [[ "$ACTION_FLAG" == "True" || "$ACTION_FLAG" == "true" ]];then
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/artifactory.yml --tags=paas_artifactory \
+             --extra-vars="DEFAULT_WORKSPACE=$default_workspace"
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE ARTIFACTORY ARTIFACTORY_RE_INSTALL False
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install paas_artifactory:PASS "
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}

@@ -1,0 +1,22 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy paas-business-config-config Container Related File(1/1)
+  template: src=paas_business_config_config.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_business_config_config.sh mode=0755
+
+- name: Start paas-business-config-config Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_business_config_config.sh"
+
+# need wait time
+
+- name: Copy paas-business-config-admin Container Related File(1/1)
+  template: src=paas_business_config_admin.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_business_config_admin.sh mode=0755
+
+- name: Start paas_business_config_admin Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_business_config_admin.sh"
+
+- name: Copy paas-business-config-portal Container Related File(1/1)
+  template: src=paas_business_config_portal.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_business_config_portal.sh mode=0755
+
+- name: Start paas_business_config_portal Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_business_config_portal.sh"

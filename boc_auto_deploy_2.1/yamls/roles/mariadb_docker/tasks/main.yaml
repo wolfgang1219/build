@@ -1,0 +1,108 @@
+- name: Dispacth the ssh key
+  authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+###################################
+# Here Will Add Mariadb Container
+###################################
+- name: Create DB Related Directory
+  file: path=/var/mariadb/datadir state=directory
+
+- name: Create Related Docker Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy DB Container Related File(1/1)
+  template: src=docker_database.j2 dest={{ DEFAULT_WORKSPACE }}/docker/docker_database.sh mode=0755
+
+- name: Start DataBase Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/docker_database.sh '{{ DB_PASS }}' {{ DB_PORT }}"
+  register: db_container_status
+
+######################################################
+    
+- name: Create Related Directory
+  file: path={{ DEFAULT_WORKSPACE }}/rpms/ state=directory
+  when: db_container_status.rc != 0
+
+- name: Copy Related Package
+  copy: src={{ DIR }}/rpms/mariadb-rpms dest={{ DEFAULT_WORKSPACE }}/rpms/ force=yes mode=0644
+  when: db_container_status.rc != 0
+ 
+- name: Clean Pre Conflict RPMs
+  yum: name=mariadb-libs-5.5.52-1.el7.x86_64 state=absent
+  ignore_errors: True 
+  when: db_container_status.rc != 0
+
+- name: Install Dependency
+  yum: name=perl state=latest
+  when: db_container_status.rc != 0
+
+- name: Pre-Check Mariadb Status
+  shell: mysql -h127.0.0.1 -P{{DB_PORT}} -uroot -p'{{ DB_PASS }}' -e "select version();"
+  register: mysql_install_status
+  ignore_errors: true
+  when: db_container_status.rc != 0
+ 
+- name: Install Mariadb Software
+  shell: rpm -ivh {{ DEFAULT_WORKSPACE }}/rpms/mariadb-rpms/* 
+  register: install_result
+  #when: mysql_install_status.rc != 0 and db_container_status.rc != 0
+  when: db_container_status.rc != 0
+   
+# Here Need Some Enhance Later (port)
+
+- name: Mariadb Start
+  service: name=mariadb state=started enabled=yes
+  when: install_result.changed == true
+      
+- name: Mariadb Enable
+  service: name=mariadb enabled=yes
+  when: install_result.changed == true
+
+- name: Configure DB(0)
+  #shell: mysqld_safe --skip-grant-tables > /dev/null &
+  shell: /usr/bin/mysqladmin -u root password '{{ DB_PASS }}'
+  when: install_result.changed == true
+      
+- name: Configure DB(2)
+  shell: /usr/bin/mysql -uroot -p'{{ DB_PASS }}' -Dmysql -e "grant all privileges on *.* to root@'%' identified by '"{{ DB_PASS }}"' with grant option;" 
+  when: install_result.changed == true
+
+- name: Create New DB User(3)
+  shell: /usr/bin/mysql -uroot -p'{{ DB_PASS }}' -Dmysql -e "create user bocloud@'%' identified by '"{{ DB_PASS }}"';"
+  when: install_result.changed == true
+
+- name: Grant Related Acess Privileges(4)
+  shell: /usr/bin/mysql -uroot -p'{{ DB_PASS }}' -Dmysql -e "grant all privileges on *.* to bocloud@'%' identified by '"{{ DB_PASS }}"' with grant option;"
+  when: install_result.changed == true
+
+- name: Flush Privileges(5)
+  shell: /usr/bin/mysql -uroot -p'{{ DB_PASS }}' -Dmysql  -e "flush privileges" &>/dev/null
+  when: install_result.changed == true
+
+- name: Mariadb Restart
+  service: name=mariadb state=restarted
+  when: install_result.changed == true
+# Install mysql-client
+- name: Install Mysql-Client
+  yum: name=MariaDB-client state=latest enablerepo=uboc 
+
+- name: Create Related Directory
+  file: path={{ DEFAULT_WORKSPACE }}/bin state=directory
+
+- name: Copy Related SQL File
+  copy: src=sql dest={{ DEFAULT_WORKSPACE }}/ force=yes mode=0644
+   
+- name: Copy Related Scripts
+  template: src=import_database.j2 dest={{ DEFAULT_WORKSPACE }}/bin/import_database force=yes mode=0644
+
+- name: Copy Related Env File
+  copy: src=logs dest={{ DEFAULT_WORKSPACE }}/bin force=yes mode=0644
+
+- name: Execute Importing SQL Into Database Action
+  command: sh {{ DEFAULT_WORKSPACE }}/bin/import_database {{ DEFAULT_WORKSPACE }} 
+
+#- name: Clean Up SQL
+#  file: path={{ DEFAULT_WORKSPACE }}/sql state=absent
+
+
+

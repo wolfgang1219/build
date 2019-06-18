@@ -1,0 +1,61 @@
+- hosts: common
+  user: root
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '/root/.ssh/id_rsa.pub') }}"
+
+    - name: Stop firewalld
+      service: name=firewalld state=stopped enabled=no
+
+    - name: Disabled selinux (00-Stop)
+      selinux: state=disabled
+
+    - name: Disabled selinux (01-Diabled)
+      lineinfile:  dest=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled' state=present
+
+    - name: Copy Basic(Docker-0/2) Software
+      copy: src=rpms/docker-rpms dest=/tmp/ force=yes mode=0644
+      
+    - name: Install Basic(Docker-1/2) Software 
+      shell: rpm -Uvh /tmp/docker-rpms/* --force  
+
+    - name: Copy Basic Config (Docker-2/2) Software
+      copy: src=template/daemon.json dest=/etc/docker/daemon.json force=yes mode=0644
+
+    #- name: Install NTP Software
+    #  yum: name=/tmp/package/ntp-4.2.6p5-25.el7.centos.2.x86_64.rpm state=present
+
+    #- name: Install NTPDATE Software
+    #  yum: name=/tmp/package/ntpdate-4.2.6p5-25.el7.centos.2.x86_64.rpm state=present
+
+    - name: Update The NTP Configure(00-Clean)
+      shell: sed -i '/^server.*/d' /etc/ntp.conf
+
+    - name: Update The NTP Configure(01-Update)
+      shell: echo "server {{ NTP_SERVER }} iburst" >>/etc/ntp.conf
+
+    - name: Enable Docker-ce Service
+      service: name=docker enabled=yes
+
+    - name: Restart Docker-ce Service
+      service: name=docker state=restarted
+
+    #- name: Enable NTP Service
+    #  service: name=ntpd enabled=yes
+
+    #- name: Restart The NTP Service
+    #  service: name=ntpd state=restarted
+
+    - name: Synchronise The Time
+      shell: ntpdate -d {{ NTP_SERVER }}
+     
+    #- name: Clean The Existing Install Package(00)
+    #  file:
+    #    path: /tmp/package/
+    #    state: absent
+
+    #- name: Clean The Existing Install Package(01)
+    #  file:
+    #    path: /tmp/package/package.tar.gz
+    #    state: absent

@@ -1,0 +1,102 @@
+- hosts: PORTAL
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Stop firewalld
+      service: name=firewalld state=stopped enabled=no
+
+    - name: Disabled selinux (00-Stop)
+      selinux: state=disabled
+
+    - name: Disabled selinux (01-Diabled)
+      lineinfile:  dest=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled' state=present
+
+    - name: Update Repo(0/2)
+      file: path=/etc/yum.repos.d/bak state=directory
+
+    - name: Update Repo(1/2)
+      shell: mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/bak/
+
+    - name: Update Repo(2/2)
+      copy: src={{ DIR }}/template/boc1.8.repo dest=/etc/yum.repos.d/boc1.8.repo force=yes mode=0644
+
+    - name: Install Base NFS
+      yum: name=nfs-utils state=latest
+
+    - name: Install Docker Soft
+      yum: name=docker-ce state=latest
+
+    - name: Enable Docker-ce Service
+      service: name=docker enabled=yes
+
+    - name: Start Docker-ce [0/1] Service
+      service: name=docker state=started
+
+    - name: Copy Basic Config (Docker-2/2) Software
+      copy: src={{ DIR }}/template/daemon.json dest=/etc/docker/daemon.json force=yes mode=0644
+
+    - name: Copy Install ntp Software(0)
+      yum: name=ntp state=latest
+   
+    - name: Update The NTP Configure(1)
+      lineinfile:  dest=/etc/ntp.conf  regexp='^server.*'  state=absent
+ 
+    - name: Update The NTP Configure(2)
+      shell: echo "server {{ NTP_SERVER }} iburst" >/etc/ntp.conf
+
+    - name: Enable NTP Service (3)
+      service: name=ntpd enabled=yes
+    
+    - name: Restart The NTP Service (4)
+      service: name=ntpd state=restarted
+
+    - name: Sync Time (5)
+      shell: ntpdate -d {{ NTP_SERVER }}
+      ignore_errors: true
+
+    - name: Restart Docker-ce [1/1] Service
+      service: name=docker state=restarted
+
+    - name: Create Target Direatory
+      file: path={{ WORSPACE }}/config  state=directory
+
+    - name: Copy Related Configuration File-[0/3]
+      copy: src={{ DIR }}/config/auth-config dest={{ WORSPACE }}/config force=yes mode=0644
+
+    - name: Copy Related Configuration File-[1/3]
+      copy: src={{ DIR }}/config/other-config dest={{ WORSPACE }}/config force=yes mode=0644
+    
+    - name: Copy Local hosts File
+      copy: src={{ DIR }}/hosts/hosts dest=/etc/hosts force=yes mode=0644
+
+    - name: Create Target Direatory
+      file: path=/opt/deploy/bin  state=directory
+
+    - name: Copy Related Configuration File-[2/3]
+      copy: src={{ DIR }}/bin/run_portal dest={{ WORSPACE }}/bin/run_portal force=yes mode=0644
+
+    - name: Copy Related Configuration File-[3/3]
+      copy: src={{ DIR }}/bin/tool dest={{ WORSPACE }}/bin/tool force=yes mode=0644
+     
+    - name: Copy Related Configuration File-logs]
+      copy: src={{ DIR }}/bin/logs dest={{ WORSPACE }}/bin/logs force=yes mode=0644
+    
+    #- name: Add Zabbix-Server Resolve Record
+    #  lineinfile:
+    #      path: /etc/hosts
+    #      line: '{{ ZABBIX_SERVER }}  zabbix-server'
+
+    - name: Update Repo File(0/2-Clean Tmp File)
+      file: path=/etc/yum.repos.d/boc1.8.repo state=absent
+
+    - name: Update Repo(1/2-Recovery)
+      shell: mv /etc/yum.repos.d/bak/*.repo /etc/yum.repos.d/
+
+    - name: Update Repo(2/2-Back )
+      file: path=/etc/yum.repos.d/bak state=absent
+
+    - name: Clean Tmp Repo
+      file: path=/etc/yum.repos.d/boc1.8.repo state=absent

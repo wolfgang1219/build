@@ -1,0 +1,8 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy paas_application Container Related File(1/1)
+  template: src=paas_application.j2 dest={{ DEFAULT_WORKSPACE }}/docker/paas_application.sh mode=0755
+
+- name: Start paas_application Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/paas_application.sh"

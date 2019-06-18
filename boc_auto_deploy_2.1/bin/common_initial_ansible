@@ -1,0 +1,40 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+. $DIR/bin/common_ssh_key
+
+function install_ansible
+{
+    ansible --version &> /dev/null
+    if [ $? -ne 0 ]
+    then
+        sudo rpm -Uvh $DIR/rpms/sshpass-1.06-2.el7.x86_64.rpm &> /dev/null
+        sudo rpm -Uvh $DIR/rpms/ansible-rpms/* --force &> /dev/null
+        if [ $? -ne 0 ]
+        then
+            _log_err "Install Ansible Meet Error, Please Contack The Supportor!"
+            EXECUTE_NEXT_STEP_FLAG=1
+        else 
+            _log_succ "Ansible Install:  Pass"
+            sudo crudini --set /etc/ansible/ansible.cfg defaults host_key_checking False
+        fi
+    else
+         _log_succ "Ansible Check:  Pass"
+         sudo crudini --set /etc/ansible/ansible.cfg defaults host_key_checking False
+         EXECUTE_NEXT_STEP_FLAG=0
+    fi
+}
+
+function common_initial_ansible_action
+{
+     install_ansible
+     common_ssh_key_action
+}

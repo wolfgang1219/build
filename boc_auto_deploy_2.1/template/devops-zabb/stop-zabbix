@@ -1,0 +1,17 @@
+####################################################
+##
+## Copyright (2017, ) Institute of Software, CAS
+## Copyright (2017, ) Bocloud. Co., Lmt.
+##
+## Author: wuheng@{otcaix.iscas.ac.cn, beyondcent.com}
+## Date  : 2017/8/10
+##
+#####################################################
+
+
+echo "Stop Zabbix"
+systemctl stop httpd
+systemctl disable httpd
+systemctl stop zabbix-server
+systemctl disable zabbix-server
+

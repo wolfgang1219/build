@@ -1,0 +1,39 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+
+. $DIR/bin/tool
+
+CONFIG_FILE=$DIR/config/Common.conf
+
+zabbix_action=$(crudini --get $CONFIG_FILE ZABBIX ZABBIX_RE_INSTALL)
+
+
+function common_initial_zabbix_action
+{
+     if [[ $zabbix_action == "True" || $zabbix_action == "true" ]]
+     then
+
+          ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/module/prepare_zabbix.yaml --extra-vars="DIR=$DIR WORKSPACE=$default_workspace NTP_SERVER=$NTP_SERVER"
+    
+          if [[ $? -eq 0 ]]
+          then
+              crudini --set $CONFIG_FILE ZABBIX ZABBIX_RE_INSTALL False &>/dev/null
+              EXECUTE_NEXT_STEP_FLAG=0
+              _log_succ "Zabbix Install Action : [PASS]"
+          else
+              EXECUTE_NEXT_STEP_FLAG=1
+              _log_err "Zabbix Install Action : [FAIL]"
+          fi
+     else
+         _log_warn "Zabbix Do not Re-install"
+     fi
+
+}

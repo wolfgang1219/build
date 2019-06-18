@@ -1,0 +1,76 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+. $DIR/bin/tool
+. $DIR/bin/logs
+
+
+CONFIG_FILE=$DIR/config/Common.conf
+
+SQL_USER=$(crudini --get $CONFIG_FILE  DB DB_USER)
+SQL_PASS=$(crudini --get $CONFIG_FILE  DB DB_PASS)
+SQL_PORT=$(crudini --get $CONFIG_FILE DB DB_PORT)
+DB_ACTION_FLAG=$(crudini --get $CONFIG_FILE  DB DB_RE_INSTALL)
+PORTAL_DB_ACTION_FLAG=$(crudini --get $CONFIG PORTAL DevOPS_DB_RE_INSTALL)
+#####################
+#database
+source_into_file SQL_USER $SQL_USER
+source_into_file SQL_PASS $SQL_PASS
+source_into_file SQL_PORT $SQL_PORT
+
+
+
+function common_initial_database_action
+{
+     _banner_index "Install Database (Mariadb)"
+     echo --extra-vars="DIR=$DIR DB_USER=$SQL_USER DB_PASS=$SQL_PASS DB_PORT=$SQL_PORT  DEFAULT_WORKSPACE=$default_workspace NTP_SERVER=$NTP_SERVER VIP=$VIP"
+     if [[ "$DB_ACTION_FLAG" == "True" || "$DB_ACTION_FLAG" == "true" ]]
+     then
+         #VIP=$(crudini --get $CONFIG_FILE DB DB_CLUSTER_VIP)
+         hostscnt=$(ansible -i $DIR/hosts/common_inventory_hosts DB --list-hosts | wc -l)
+         if [[ $hostscnt == 2  ]];then
+             ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/uboc.yml --tags=mariadb_docker --extra-vars="DIR=$DIR DB_USER=$SQL_USER DB_PASS=$SQL_PASS DB_PORT=$SQL_PORT  DEFAULT_WORKSPACE=$default_workspace NTP_SERVER=$NTP_SERVER VIP=$VIP"
+         else
+             ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/galera.yml --tags setup --extra-vars="DIR=$DIR DB_PORT=$SQL_PORT DB_USER=$SQL_USER maridb_password=$SQL_PASS"
+             ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/galera.yml --skip-tags setup --extra-vars="DIR=$DIR DB_PORT=$SQL_PORT DB_USER=$SQL_USER maridb_password=$SQL_PASS"
+             ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/galera_bootstrap.yml --extra-vars="DB_PORT=$SQL_PORT DEFAULT_WORKSPACE=$default_workspace maridb_password=$SQL_PASS"
+         fi
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE DB DB_RE_INSTALL False
+             common_import_sql_into_database
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install Database (Mariadb):PASS "
+         common_import_sql_into_database
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}
+
+
+function common_import_sql_into_database
+{
+   _banner_index "Import SQL Into Database(Mariadb)"
+   if [[ "$PORTAL_DB_ACTION_FLAG" == "True" || "$PORTAL_DB_ACTION_FLAG" == "true" ]]
+     then
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/import_database.yaml --extra-vars="DIR=$DIR WORKSPACE=$default_workspace" 
+         if [[ $? -eq 0 ]]
+         then
+             EXECUTE_NEXT_STEP_FLAG=0
+             crudini --set $CONFIG PORTAL DevOPS_DB_RE_INSTALL False
+             _log_succ "Import SQL Into Database:PASS "
+         else
+             EXECUTE_NEXT_STEP_FLAG=1
+            _log_err "Import SQL Into Database: FAIL "
+         fi
+   fi
+}

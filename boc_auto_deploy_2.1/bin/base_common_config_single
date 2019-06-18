@@ -1,0 +1,420 @@
+#!/bin/bash
+
+#DIR="$( cd "$( dirname "$0"  )" && pwd  )"
+
+#. $DIR/bin/logs
+#. $DIR/db_reset
+
+LOCAL_IP=$(echo $(ip -4 route get '8.8.8.8') | awk '{print $7}')
+
+CONFIG_FILE="$DIR/config/Common.conf"
+
+#Tags
+TAGS=$(crudini --get $CONFIG_FILE PORTAL PORTAL_TAGS)
+
+#logPath
+logBasePath=$(crudini --get $CONFIG_FILE PORTAL PORTAL_LOG_PATH)
+
+
+#Prepare
+function Common_Prepare
+{
+    #_banner "Common Prepare Env"
+    FLAG=1
+    #create logs path
+    modules_list="application auth config deployer monitor pipeline runtime appstore"
+
+    for module in $modules_list 
+	do
+    logPath=${logBasePath}/${module}
+      if [ ! -d "$logPath" ] 
+	  then
+          #echo "Create $logPath"
+          mkdir -p $logPath
+      fi
+    done
+
+	#CRUDINI_Check
+	soft_status=CRUDINI_Check
+	#DB
+	db_status=DB_Config
+	#ZK
+	zk_status=ZK_Config
+	
+	if [ $soft_status -eq 0 && $db_status -eq  0 && $zk_status -eq 0]
+	then
+		FLAG=0
+	fi
+	
+	return $FLAG
+}
+
+
+#Config File Confirm
+
+#CRUDINI Confirm
+function CRUDINI_Check
+{
+    _banner "Install Related SoftWare"
+	
+    FLAG=1
+    crudini --version > /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[1/1] Soft Install : [PASS] "
+    else
+	_log_err "[1/1] Soft Install , NOT Ready , New Software Install Job Start"
+       rpm -Uvh $DIR/rpms/crudini-*.rpm > /dev/null
+       if [ $? -eq 0 ]
+       then
+            _log_succ "[1/3] Soft Install : [PASS]"
+	    FLAG=0
+        else
+             _log_err "[1/3] Soft Install : [FAILED]"
+      fi
+    fi
+	return $FLAG
+}
+
+#DB related 
+function DB_Config
+{
+    _banner "DataBase Related Config"
+    FLAG=1
+	
+    DB_HOST=$(crudini --get $CONFIG_FILE DB DB_HOST)
+    DB_PORT=$(crudini --get $CONFIG_FILE DB DB_PORT)
+    DB_USER=$(crudini --get $CONFIG_FILE DB DB_USER)
+    DB_PASS=$(crudini --get $CONFIG_FILE DB DB_PASS)
+    
+    DB_PREFIX="jdbc:mysql://"
+    #Here May Need Update Later.
+    DB_NAME="nacha_auth"
+    DB_END="?characterEncoding=utf8&allowMultiQueries=true&&zeroDateTimeBehavior=convertToNull"
+
+    TARGET_FILE=$DIR/auth-config/jdbc.properties    
+
+    DB_URL=$DB_PREFIX$DB_HOST":"$DB_PORT"/"$DB_NAME$DB_END
+
+    crudini --set $TARGET_FILE JDBC jdbc.url $DB_URL > /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[1/3] JDBC Config-url : [PASS]"
+	FLAG=0
+    else
+        _log_err "[1/3] JDBC Config-url : [FAILED]"
+	FLAG=1
+    fi
+
+    crudini --set $TARGET_FILE JDBC jdbc.username $DB_USER > /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[2/3] JDBC Config-user : [PASS]"
+	FLAG=0
+    else
+        _log_err "[2/3] JDBC Config-user : [FAILED]"
+	FLAG=1
+    fi
+    
+    crudini --set $TARGET_FILE JDBC jdbc.password $DB_PASS > /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[3/3] JDBC Config-password : [PASS]"
+	FLAG=0
+    else
+        _log_err "[3/3] JDBC Config-password : [FAILED]"
+	FLAG=1
+    fi
+	return $FLAG
+
+}
+
+function ZK_Config
+{
+    _banner "Zookeeper Related Config"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+    ZK_HOST=$(crudini --get $CONFIG_FILE ZK ZK_HOST)
+    ZK_PORT=$(crudini --get $CONFIG_FILE ZK ZK_PORT)
+    ZK_URL=$ZK_HOST":"$ZK_PORT
+
+    export ZK_URL=$ZK_URL
+
+    TARGET_FILE=$DIR/other-config/zk.properties
+    crudini --set $TARGET_FILE ZK zk.server.url $ZK_URL > /dev/null
+    if [ $? -eq 0 ]
+    then
+	_log_succ "[1/1] Zookeeper Config : [PASS]"
+	FLAG=0
+    else
+	_log_err "[1/1] Zookeeper Config : [FAILED]"
+    fi
+	return $FLAG
+}
+
+
+#00-Registrator
+function Install_Necessary_Registrator
+{
+    _banner "Install Necessary Registrator [0/]" 
+    FLAG=1
+#    docker run -d --restart=always --name=registrator --net=host \
+#				--volume=/var/run/docker.sock:/tmp/docker.sock abcsys.cn:5000/gliderlabs/registrator:latest \
+#				-ip $LOCAL_IP  \
+#				-resync 20 zookeeper://$ZK_URL/boc/modules
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Registrator : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Registrator : [FAILED]"
+    fi
+	return $FLAG
+}
+
+#01-Auth-9008
+function Install_Devops_Auth
+{
+    _banner "Auth Service Will run on 9008"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-auth \
+#				-p 9008:8080 -v $PWD/config/auth-config/:/usr/local/tomcat/webapps/devops-auth/WEB-INF/classes/config/ \
+#				-v /etc/hosts:/etc/hosts \
+#				-v /etc/localtime:/etc/localtime \
+#				-v ${logBasePath}/auth:/usr/local/tomcat/logs/ \
+#				--restart=always abcsys.cn:5000/devops-auth:$TAGS
+
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Auth : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Auth : [FAILED]"
+    fi
+	return $FLAG
+}
+
+#02-Config
+function Install_Devops_Config
+{
+   _banner "Install Devops Config Service"
+   FLAG=1
+   #Cluster Scope 
+	
+   #Single Scope 
+#   docker run -itd --restart=always --name=devops-config -P \
+#		-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-config/WEB-INF/classes/config/zk.properties  \
+#		-v /etc/hosts:/etc/hosts \
+#		-v /etc/localtime:/etc/localtime \
+#		-v ${logBasePath}/config:/usr/local/tomcat/logs/ \
+#		--restart=always abcsys.cn:5000/devops-config:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Config : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Config : [FAILED]"
+    fi
+	return $FLAG
+	
+}
+
+function Install_Devops_Runtime
+{
+    _banner "Install Devops Runtime"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-runtime -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-runtime/WEB-INF/classes/config/zk.properties  \
+#	-v /etc/hosts:/etc/hosts -v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/runtime:/usr/local/tomcat/logs/ \
+#	--restart=always abcsys.cn:5000/devops-runtime:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Runtime : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Runtime : [FAILED]"
+    fi
+	return $FLAG
+
+}
+
+function Install_Devops_Application
+{
+    _banner "Install Devops Application"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-application -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-application/WEB-INF/classes/config/zk.properties  \
+#	-v /etc/hosts:/etc/hosts -v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/application:/usr/local/tomcat/logs/ 
+#	--restart=always abcsys.cn:5000/devops-application:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Application : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Application : [FAILED]"
+    fi
+	return $FLAG
+
+}
+
+function Install_devops_Deployer
+{
+    _banner "Install Devops Deployer"
+    FLAG=1
+#    docker run -itd --restart=always --name=devops-deployer -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-deployer/WEB-INF/classes/config/zk.properties  \
+#	-v /etc/hosts:/etc/hosts \
+#	-v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/deployer:/usr/local/tomcat/logs/ \
+#	--restart=always abcsys.cn:5000/devops-deployer:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Deployer : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Deployer : [FAILED]"
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Monitor
+{
+    _banner "Install Devops Monitor"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-monitor -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-monitor/WEB-INF/classes/config/zk.properties  \
+#	-v /etc/hosts:/etc/hosts \
+#	-v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/monitor:/usr/local/tomcat/logs/ \
+#	--restart=always abcsys.cn:5000/devops-monitor:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Monitor : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Monitor : [FAILED]"
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Pipeline
+{
+    _banner "Install Devops Pipeline"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-pipeline -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-pipeline/WEB-INF/classes/config/zk.properties \
+#	-v /etc/hosts:/etc/hosts \
+#	-v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/pipeline:/usr/local/tomcat/logs/ \
+#	--restart=always abcsys.cn:5000/devops-pipeline:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Pipeline : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Pipeline : [FAILED]"
+    fi
+	return $FLAG
+}
+
+function Install_Devops_Appstore
+{
+    _banner "Install Devops Appstore"
+    FLAG=1
+    #Cluster Scope 
+	
+    #Single Scope 
+#    docker run -itd --restart=always --name=devops-appstore -P \
+#	-v $PWD/config/other-config/zk.properties:/usr/local/tomcat/webapps/devops-appstore/WEB-INF/classes/config/zk.properties  \
+#	-v /etc/hosts:/etc/hosts \
+#	-v /etc/localtime:/etc/localtime \
+#	-v ${logBasePath}/appstore:/usr/local/tomcat/logs/ \
+#	--restart=always abcsys.cn:5000/devops-appstore:$TAGS
+    if [ $? -eq 0 ]
+    then
+        _log_succ "Install Appstore : [PASS]"
+		FLAG=0
+    else
+        _log_err "Install Appstore : [FAILED]"
+    fi
+	return $FLAG
+}
+
+function Main_Config
+{
+	common_status=Common_Prepare
+	echo $common_status "=========================="
+	if [ $common_status -eq 0 ]
+	then
+		regis_status = Install_Necessary_Registrator
+		if [ $regis_status -eq 0 ]
+		then
+			auth_status = Install_Devops_Auth
+			config_status = Install_Devops_Config
+			if [ $auth_status -eq 0 && $config_status -eq 0 ]
+			then
+				#Other_Related
+				Other_Related
+				
+			else
+				echo "----" 
+			fi
+		else
+			_log_err "[Necessary Registrator] Meet Unexpected Error"
+			return 1
+		fi
+	
+	else
+		_log_err "[Common Prepare] Meet Unexpected Error"
+		return 1
+	fi
+}
+
+function Other_Related
+{
+	FLAG=1
+	pipeline_status = Install_Devops_Pipeline
+	monitor_status = Install_Devops_Monitor
+	application_status = Install_Devops_Application
+	runtime_status = Install_Devops_Runtime
+	
+	if [ $pipeline_status -eq 0 && $monitor_status -eq 0 && $application_status -eq 0 && $runtime_status -eq 0]
+	then
+		FLAG=0
+	else
+		if [ $pipeline_status -ne 0 ]
+		then
+			_log_err "[Devops Pipeline] Meet Unexpected Error"
+		elif [ $monitor_status -ne 0 ]
+		then
+			_log_err "[Devops Monitor] Meet Unexpected Error"
+		elif [ $application_status -ne 0 ]
+		then
+			_log_err "[Devops Application] Meet Unexpected Error"
+		elif [ $runtime_status -ne 0 ]
+		then
+			_log_err "[Devops Runtime] Meet Unexpected Error"
+		fi
+	fi
+	return $FLAG
+}
+

@@ -1,0 +1,9 @@
+- name: remove the Mariadb package
+  yum: name={{ item }} state=absent
+  with_items:
+    - MariaDB-client
+    - MariaDB-server
+    - galera
+
+- name: clean up mysql file
+  file: path=/var/lib/mysql state=absent

@@ -1,0 +1,238 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+ANSIBLE_INVENTORY_PATH="$DIR/hosts/common_inventory_hosts"
+function prepare_get_common_ip
+{
+    CONFIG=${1?"Need Config File"}
+    SECTION=${2?"Need Section"}
+   
+    SSH_USER=$(crudini --get $CONFIG DEFAULT BASE_USER)
+    SSH_PASS=$(crudini --get $CONFIG DEFAULT BASE_PASSWD)
+
+    
+    INVENTORY_FILE=${ANSIBLE_INVENTORY_PATH}
+    INVENTORY_TMP_FILE=$DIR/.hosts.tmp
+
+    [ ! -f $INVENTORY_FILE ] && touch $INVENTORY_FILE
+    [ ! -f $INVENTORY_TMP_FILE ] && touch $INVENTORY_TMP_FILE
+
+    FLAG="["$SECTION"]"
+    
+    #IFS_old=$IFS
+    #IFS=',' 
+    #grep $FLAG $hosts > /dev/null
+    grep $SECTION $INVENTORY_FILE > /dev/null 
+    if [ $? -eq 0 ]
+    then
+        for i in $(crudini --get $CONFIG $SECTION| grep "_IP")
+        do
+            ip_status=$(crudini --get $CONFIG $SECTION $i)
+            ip_status==${IP//,/\ }
+            if [ $ip_status == $i ];then
+                #crudini --get $CONFIG $SECTION $i >> .hosts.tmp
+                IP=$(crudini --get $CONFIG $SECTION $i )
+                for i in $IP;do
+                   echo ${i/:*/}' host_var_ip='${i/:*/}' ansible_user="'$SSH_USER'"  ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $DIR/.hosts.tmp
+                done
+                cat $DIR/.hosts.tmp | uniq >> $INVENTORY_FILE && rm -rf $DIR/.hosts.tmp
+                #add=$(cat .hosts.tmp | uniq)&& echo $add >> $INVENTORY_FILE && sed -i '/common/a\'$add'' $INVENTORY_FILE && rm -rf .hosts.tmp
+                echo -e "\n" >> $INVENTORY_FILE
+            else
+                echo "[ "$ip_status " ] Exist, Skip ..."
+            fi
+        done
+    else
+       echo $FLAG >> $INVENTORY_FILE
+
+       for i in $(crudini --get $CONFIG $SECTION| grep "_IP")
+       do
+           #crudini --get $CONFIG $SECTION $i >> .hosts.tmp
+           IP=$(crudini --get $CONFIG $SECTION $i )
+           IP=${IP//,/\ }
+           if [[ $i == "CONSUL_HOST_IP" ]];then
+               for i in $IP;do
+                   echo ${i/:*/}' host_var_ip='${i/:*/}' consul_node_role=server consul_bootstrap_expect=true ansible_user="'$SSH_USER'" ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $DIR/.hosts.tmp
+               done
+           elif [[ $i == "CONSUL_CLIENT_PAAS_IP" ]];then
+               for i in $IP;do
+                   echo ${i/:*/}' host_var_ip='${i/:*/}' consul_node_role=client ansible_user="'$SSH_USER'" ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $DIR/.hosts.tmp
+               done
+           else
+               for i in $IP;do
+                   echo ${i/:*/}' host_var_ip='${i/:*/}' ansible_user="'$SSH_USER'"  ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $DIR/.hosts.tmp
+               done
+           fi
+       done
+       cat $DIR/.hosts.tmp | uniq >> $INVENTORY_FILE && rm -rf $DIR/.hosts.tmp
+       #add=$(cat .hosts.tmp | uniq)&& echo $add >> $INVENTORY_FILE && sed -i '/common/a\'$add'' $INVENTORY_FILE && rm -rf .hosts.tmp
+       echo -e "\n" >> $INVENTORY_FILE
+   fi
+   #IFS=$IFS_old
+}
+
+function get_deploy_target_ip
+{
+    CONFIG=${1?"Need Config File"}
+    SECTION=${2?"Need Section"}
+
+    SSH_USER=$(crudini --get $CONFIG DEFAULT BASE_USER)
+    SSH_PASS=$(crudini --get $CONFIG DEFAULT BASE_PASSWD)    
+
+    INVENTORY_FILE=${ANSIBLE_INVENTORY_PATH}
+
+    [ ! -f $INVENTORY_FILE ] && touch $INVENTORY_FILE
+
+    SECTION_LIST=$(crudini --get $CONFIG $SECTION| grep _IP)
+ 
+    for S_SECTION in $SECTION_LIST
+    do
+       grep $S_SECTION $INVENTORY_FILE > /dev/null
+       if [ $? -eq 0 ]
+       then
+           #Y
+           echo "Existing"
+           #ip_status=$(crudini --get $CONFIG $SECTION $S_SECTION)
+           _log_info $S_SECTION" Existing, Skipping..."
+           
+       else
+           #N
+           echo "["${S_SECTION:0:-3}"]" >> $INVENTORY_FILE
+           ip_status=$(crudini --get $CONFIG $SECTION $S_SECTION)
+           paas_ips=${ip_status//,/\ }
+           #echo $ip_status "   ansible_ssh_user="$SSH_USER" ansible_ssh_pass="$SSH_PASS" ansible_become_pass="$SSH_PASS >> $INVENTORY_FILE
+           if [ "${S_SECTION:0:-3}" = "CONSUL" ];then
+               echo $ip_status 'consul_node_role=bootstrap ansible_user="'$SSH_USER'"  ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $INVENTORY_FILE
+           else
+               for ips in $paas_ips;do
+                   echo $ips '   ansible_user="'$SSH_USER'"  ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"' >> $INVENTORY_FILE
+               done
+           fi
+           echo -e "\n" >> $INVENTORY_FILE
+            
+       fi
+    done
+}
+
+function add_registry_into_hosts
+{
+   # 
+   CONFIG=${1?"Need Common Configuration File"}
+   # Here Support HA - 0910 
+   registry_ha_action=$(crudini --get $CONFIG_FILE REGISTRY  REGISTRY_HA_ENABLED)
+   if [[ $registry_ha_action == "True" || $registry_ha_action == "true" ]]
+   then
+        
+        R_IP=$(crudini --get $CONFIG_FILE REGISTRY REGISTRY_CLUSTER_VIP)
+   else
+	R_IP=$(crudini --get $CONFIG REGISTRY REGISTRY_HOST_01_IP)
+   fi
+
+   R_DN=$(crudini --get $CONFIG REGISTRY REGISTRY_DOMAIN_NAME)
+   R_PORT=$(crudini --get $CONFIG REGISTRY REGISTRY_PORT)
+
+   REGISTRY_URL=$R_DN":"$R_PORT
+
+   # Add This Record Into Sys Path
+   source_into_file REGISTRY_URL $REGISTRY_URL
+
+   Record=$R_IP" "$R_DN
+   
+   # Add This Record Into File
+   echo $Record > $DIR/hosts/hosts
+}
+
+#CRUDINI Confirm
+function CRUDINI_Check
+{
+    _banner_index "Install Related SoftWare [CRUDINI]"
+
+    crudini --version &> /dev/null
+    if [ $? -eq 0 ]
+    then
+        _log_succ "[1/1] Soft [crudini] Install : [PASS] "
+    else
+        _log_err "[1/1] Soft [crudini] , NOT Ready , New Software Install Job Start"
+       sudo rpm -Uvh $DIR/rpms/crudini-*.rpm > /dev/null
+       if [ $? -eq 0 ]
+       then
+            _log_succ "[1/3] Soft [crudini] Install : [PASS]"
+            EXECUTE_NEXT_STEP_FLAG=0
+        else
+             _log_err "[1/3] Soft [crudini] Install : [FAILED]"
+             EXECUTE_NEXT_STEP_FLAG=1
+      fi
+    fi
+}
+filterIp() {
+    echo "$1" | awk -F "." \
+    '{
+        if($1>0&&$1<255&&$2>=0&&$2<=255&&$3>=0&&$3<=255&&$4>0&&$4<255)
+            print($1"."$2"."$3"."$4);
+    }'
+}
+CheckIP() {
+    pIp=`filterIp "$1"`
+    if [ "$pIp" = "" ];then
+        _log_err "$2: Invalid IP Address($1)"
+        EXECUTE_NEXT_STEP_FLAG=1
+    fi
+}
+function environment_inverntory_build
+{
+    CONFIG=${1?"Need Config File"}
+
+    SSH_USER=$(crudini --get $CONFIG DEFAULT BASE_USER)
+    SSH_PASS=$(crudini --get $CONFIG DEFAULT BASE_PASSWD)
+
+    INVENTORY_FILE=${ANSIBLE_INVENTORY_PATH}
+    declare -A env_hostset
+    [ ! -f $INVENTORY_FILE ] && touch $INVENTORY_FILE || _log_info $INVENTORY_FILE" File Ready!"
+    Group="[ENV]"
+    echo $Group >> $INVENTORY_FILE
+    for i in $(crudini --get $DIR/config/Common.conf);do
+        SECTION_LIST=$(crudini --get $CONFIG $i | grep _IP)
+        for S_SECTION in $SECTION_LIST;do
+           ip_status=$(crudini --get $CONFIG $i $S_SECTION)
+           paas_ips=${ip_status//,/\ }
+           for ips in $paas_ips;do
+               CheckIP $ips $S_SECTION
+               env_hostset["$ips"]=$(echo $ips '   ansible_user="'$SSH_USER'"  ansible_ssh_pass="'$SSH_PASS'" ansible_become_pass="'$SSH_PASS'"')
+           done
+        done    
+    done
+    for key in $(echo ${!env_hostset[*]});do
+        echo ${env_hostset[$key]} >> $INVENTORY_FILE
+    done
+    echo -e "\n" >> $INVENTORY_FILE
+}
+function common_generate_target_ips_action
+{
+     CRUDINI_Check
+     environment_inverntory_build $DIR/config/Common.conf
+     for i in $(crudini --get $DIR/config/Common.conf);do 
+         x=$(crudini --get $DIR/config/Common.conf $i | grep "RE_INSTALL")
+         if [ "x$x" != "x" ];then
+	     ret=$(crudini --get $DIR/config/Common.conf $i $x)
+	     if [ "x$ret" = "xTrue" ];then 
+                 prepare_get_common_ip $DIR/config/Common.conf $i
+	     fi
+         fi
+    done
+    #Target Module
+    action=$(crudini --get $DIR/config/Common.conf PORTAL PORTAL_ACTION)
+    if [ "x$action" != "xNone" ];then
+        get_deploy_target_ip $DIR/config/Common.conf PORTAL
+    fi
+    #Portal
+    #add_registry_into_hosts $DIR/config/Common.conf PORTAL
+###    How To Avoid 
+}
+
+

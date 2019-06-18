@@ -1,0 +1,44 @@
+global
+    daemon
+    maxconn 50000
+    stats socket /var/lib/haproxy/haproxy.sock mode 0600 level admin
+defaults
+    timeout connect 600000ms
+    timeout client  600000ms
+    timeout server  600000ms
+
+frontend paas_web_in
+bind 0.0.0.0:9001
+mode http
+log global
+use_backend real_paas_web
+option forwardfor
+
+backend real_paas_web
+  mode http
+  option  redispatch
+  option  abortonclose
+  balance source
+  option  httpchk GET /
+{% for balancing_server in web_balancing_servers %}
+   server {{balancing_server.name}} {{balancing_server.ip}}:9001 weight 5 check inter 2000 rise 2 fall 3 maxconn 8
+{% endfor %}
+
+listen mariadb_cluster 
+   bind 0.0.0.0:{{DB_PORT}}
+   mode tcp
+   balance roundrobin
+   timeout connect 1800000ms
+   timeout client 1800000ms
+   timeout server 1800000ms
+{% for balancing_server in mariadb_balancing_servers %}
+   server {{balancing_server.name}} {{balancing_server.ip}}:{{DB_PORT}} weight 5
+{% endfor %}
+
+listen stats 
+   bind *:8181
+   mode http
+   stats enable
+   stats realm Haproxy\ Statistics
+   stats uri /
+   stats auth haproxy:ju

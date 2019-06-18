@@ -1,0 +1,9 @@
+- name: Create Related Dockerdd Directory
+  file: path={{ DEFAULT_WORKSPACE }}/docker/ state=directory
+
+- name: Copy MQ Container Related File(1/1)
+  template: src=docker_mq.j2 dest={{ DEFAULT_WORKSPACE }}/docker/docker_mq.sh mode=0755
+
+- name: Start MQ Container Instance
+  shell: "{{ DEFAULT_WORKSPACE }}/docker/docker_mq.sh"
+  register: mq_container_status

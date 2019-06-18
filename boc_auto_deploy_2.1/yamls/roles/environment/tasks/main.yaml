@@ -1,0 +1,69 @@
+---
+- selinux:
+    state: disabled
+- name: disable firewalld
+  service: name=firewalld enabled=no state=stopped
+  ignore_errors: True
+- name: setting hostnames
+  lineinfile: dest=/etc/hosts regexp='{{hostvars[item].ansible_fqdn}}' line="{{item}} {{hostvars[item].ansible_fqdn}} {{hostvars[item].ansible_hostname}}"
+  with_items: "{{groups['all']}}"
+  ignore_errors: true
+
+# deploy.bocloud key/crt
+- name: setting deploy.bocloud
+  lineinfile: dest=/etc/hosts regexp='deploy.bocloud' line="{{HTTP_SERVER}} deploy.bocloud"
+
+- name: copy ca
+  copy: src=deploy.bocloud.crt dest=/etc/pki/ca-trust/source/anchors/deploy.bocloud.crt owner=root group=root mode=0644
+- name: update ca
+  shell: update-ca-trust
+
+- name: Update Repo(0/2)
+  file: path=/etc/yum.repos.d/bak state=directory
+
+- name: Update Repo(1/2)
+  shell: mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/bak/
+  ignore_errors: true
+
+- name: config uboc repo
+  yum_repository: 
+    name: uboc
+    description: uboc repo
+    file: uboc
+    baseurl: http://{{ HTTP_SERVER }}/
+    enabled: yes
+    gpgcheck: no
+
+- name: install ntpdate
+  yum: name=ntpdate state=latest enablerepo=uboc
+- name: sys to hw about time
+  lineinfile: dest=/etc/sysconfig/ntpdate state=present regexp='SYNC_HWCLOCK=no' line='SYNC_HWCLOCK=yes' backrefs=yes
+- name: Synchronise The Time
+  shell: ntpdate {{ NTP_SERVER }};timedatectl set-timezone Asia/Shanghai
+  when: NTP_SERVER != '127.0.0.1'
+- name: hwclock --systohc
+  shell: hwclock --systohc
+
+- name: docker install
+  yum: name=docker-ce state=latest enablerepo=uboc 
+- name: check distribution docker port
+  when: groups['REGISTRY'] is defined and inventory_hostname in groups['REGISTRY']
+  shell: grep '\-H tcp' /usr/lib/systemd/system/docker.service
+  register: tcpenable
+  ignore_errors: true
+
+- name: Enable Remote Acess for docker
+  when: groups['REGISTRY'] is defined and inventory_hostname in groups['REGISTRY'] and tcpenable.rc
+  lineinfile:
+    dest: /usr/lib/systemd/system/docker.service
+    state: present
+    regexp: '^ExecStart=/usr/bin/dockerd'
+    line: 'ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock'
+- name:
+  when: groups['REGISTRY'] is defined and inventory_hostname in groups['REGISTRY'] and tcpenable.rc
+  shell: systemctl daemon-reload
+- name: 
+  when: groups['REGISTRY'] is defined and inventory_hostname in groups['REGISTRY'] and tcpenable.rc
+  service: name=docker enabled=true state=restarted
+- name: start docker
+  service: name=docker enabled=true state=started

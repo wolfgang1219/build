@@ -1,0 +1,36 @@
+- hosts: DB
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Dispacth the ssh key
+      authorized_key: user=root key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+    - name: Stop firewalld
+      service: name=firewalld state=stopped enabled=no
+
+    - name: Disabled selinux (00-Stop)
+      selinux: state=disabled
+
+    - name: Disabled selinux (01-Diabled)
+      lineinfile:  dest=/etc/selinux/config  regexp='^SELINUX=' line='SELINUX=disabled' state=present
+
+    - name: Create Related Directory
+      file: path={{ WORKSPACE }}/bin state=directory
+
+    - name: Copy Related SQL File
+      copy: src={{ DIR }}/images/sql dest={{ WORKSPACE }}/ force=yes mode=0644
+   
+    - name: Copy Related Scripts
+      copy: src={{ DIR }}/bin/import_database dest={{ WORKSPACE }}/bin force=yes mode=0644
+
+    - name: Copy Related Env File(0)
+      copy: src={{ DIR }}/bin/tool dest={{ WORKSPACE }}/bin force=yes mode=0644
+
+    - name: Copy Related Env File(1)
+      copy: src={{ DIR }}/bin/logs dest={{ WORKSPACE }}/bin force=yes mode=0644
+
+    - name: Execute Importing SQL Into Database Action
+      command: sh {{ WORKSPACE }}/bin/import_database {{ WORKSPACE }} &> /tmp/tem-logs
+
+    - name: Clean Up SQL
+      file: path={{ WORKSPACE }}/sql state=absent

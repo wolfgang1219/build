@@ -1,0 +1,26 @@
+#!/bin/bash
+. $DIR/bin/tool
+. $DIR/bin/logs
+CONFIG_FILE=$DIR/config/Common.conf
+
+ACTION_FLAG=$(crudini --get $CONFIG_FILE WORKER  WORKER_RE_INSTALL)
+
+function deploy_worker
+{
+    _banner_index "Install WORKER"
+    if [[ "$ACTION_FLAG" == "True" || "$ACTION_FLAG" == "true" ]];then
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/worker.yml --tags=paas_worker \
+             --extra-vars="DEFAULT_WORKSPACE=$default_workspace CONSUL_HOST=$CONSUL_HOST CONSUL_PORT=$CONSUL_PORT CONSUL_TOKEN=$CONSUL_TOKEN RELEASE_TAGS=$RELEASE_TAGS "
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE WORKER  WORKER_RE_INSTALL  False
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install paas_worker:PASS "
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}
+

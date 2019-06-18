@@ -1,0 +1,55 @@
+#!/bin/bash
+. $DIR/bin/tool
+. $DIR/bin/logs
+CONFIG_FILE=$DIR/config/Common.conf
+
+ACTION_FLAG=$(crudini --get $CONFIG_FILE CONSUL CONSUL_RE_INSTALL)
+
+function deploy_consul
+{
+    _banner_index "Install Consul"
+    REDIS_HOSTS=""
+    MQ_HOSTS=""
+    REDIS_PASS='Beyond@123456'
+    IFS_old=$IFS
+    IFS=','
+    for redis_list in $REDIS_HOST;do 
+        REDIS_HOSTS="$REDIS_HOSTS,$redis_list:7061,$redis_list:7062,$redis_list:7063"
+    done
+    for mq_list in $MQ_HOST;do
+        MQ_HOSTS="$MQ_HOSTS,$mq_list:$MQ_PORT"
+    done
+    isHA=$(echo ${DB_HOST}|wc -w)
+    [[ $isHA > 2 ]] && DB_HOST=$HA_LB_VIP
+    IFS=$IFS_old
+    echo --extra-vars="DEFAULT_WORKSPACE=$default_workspace DB_IP=$DB_HOST DB_PASS=$DB_PASS DB_PORT=$DB_PORT DB_USER=$DB_USER \
+             MQ_IP=${MQ_HOSTS:1} MQ_PORT=$MQ_PORT MQ_USER=$MQ_USER MQ_PASS=$MQ_PASS REDIS_IP=$REDIS_HOSTS CI_HOST_PASS=${CI_HOST_PASS} \
+             REDIS_PORT=$REDIS_PORT REDIS_PASS=$REDIS_PASS XXLJOB_IP=$XXLJOB_HOST consul_acl_master_token=$CONSUL_TOKEN"
+    if [[ "$ACTION_FLAG" == "True" || "$ACTION_FLAG" == "true" ]];then
+         ansible-playbook -i $DIR/hosts/common_inventory_hosts $DIR/yamls/uboc.yml --tags=consul \
+             --extra-vars="DEFAULT_WORKSPACE=$default_workspace DB_IP=$DB_HOST DB_PASS=$DB_PASS DB_PORT=$DB_PORT DB_USER=$DB_USER \
+             MQ_IP=${MQ_HOSTS:1} MQ_PORT=$MQ_PORT MQ_USER=$MQ_USER MQ_PASS=$MQ_PASS REDIS_IP=${REDIS_HOSTS:1} \
+             PIPE_LINE_IP=$CI_HOST_IP PAAS_REPORT_IP=$PAAS_REPORT_IP PAAS_RUNTIME_IP=$PAAS_RUNTIME_IP ldap_url=$ldap_url \
+             ldap_base_dn=$ldap_base_dn ldap_credentials=$ldap_credentials ldap_user_dn=$ldap_user_dn CI_USER=$CI_USER CI_PASS=$CI_PASS CI_HOST_USER=$CI_HOST_USER \
+             CI_HOST_PASS=$CI_HOST_PASS REDIS_PORT=$REDIS_PORT REDIS_PASS=$REDIS_PASS XXLJOB_IP=$XXLJOB_HOST consul_acl_master_token=$CONSUL_TOKEN consul_acl_agent_token=$CONSUL_TOKEN"
+         if [[ $? -eq 0 ]]
+         then
+             crudini --set $CONFIG_FILE CONSUL CONSUL_RE_INSTALL False
+             import_consul_key_value
+             EXECUTE_NEXT_STEP_FLAG=0
+         else
+            EXECUTE_NEXT_STEP_FLAG=1
+         fi
+     else
+         _log_succ "Install Consul:PASS "
+         import_consul_key_value
+         EXECUTE_NEXT_STEP_FLAG=0
+     fi
+}
+
+function import_consul_key_value
+{
+  # ready go
+  return 0 
+}
+

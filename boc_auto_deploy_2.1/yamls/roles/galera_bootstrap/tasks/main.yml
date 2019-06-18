@@ -1,0 +1,33 @@
+---
+- name: init root password
+  shell: mysqladmin -uroot -P {{DB_PORT}} password '{{maridb_password}}'
+  when: inventory_hostname == groups['DB'][0]
+
+- name: Stop MariaDB on first MariaDB Galera cluster node
+  service: name=mariadb state=stopped
+  when: inventory_hostname == groups['DB'][0]
+
+- name: Bootstrap first MariaDB Galera cluster node
+  command: galera_new_cluster
+  when: inventory_hostname == groups['DB'][0]
+
+- name: Restart the other MariaDB Galera cluster nodes
+  service: name=mariadb state=restarted
+  when: inventory_hostname != groups['DB'][0]
+
+- name: Copy Related SQL File
+  copy: src=sql dest={{ DEFAULT_WORKSPACE }}/ force=yes mode=0644
+  run_once: true
+- name: grant remote access sql
+  template: src=access.sql.j2 dest={{ DEFAULT_WORKSPACE }}/sql/access.sql
+  run_once: true
+- name: bin directory
+  file: path={{ DEFAULT_WORKSPACE }}/bin state=directory
+  run_once: true
+- name: Copy Related Scripts
+  template: src=import_database.j2 dest={{ DEFAULT_WORKSPACE }}/bin/import_database force=yes mode=0644
+  run_once: true
+- name: Execute Importing SQL Into Database Action
+  command: sh {{ DEFAULT_WORKSPACE }}/bin/import_database {{ DEFAULT_WORKSPACE }}
+  run_once: true
+  when: inventory_hostname == groups['DB'][0]

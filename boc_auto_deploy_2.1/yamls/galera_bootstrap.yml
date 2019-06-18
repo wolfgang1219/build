@@ -1,0 +1,5 @@
+---
+- hosts: DB
+  serial: 1
+  roles:
+    - galera_bootstrap

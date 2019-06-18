@@ -1,0 +1,22 @@
+#!/bin/bash
+base_name="paas-web"
+container_svr_name="${base_name}-$(hostname -s)"
+
+CONTAINER_NAME=$(docker ps --all -f name=${container_svr_name} -q)
+if [ "$CONTAINER_NAME" != "" ];then
+    docker stop $CONTAINER_NAME
+    docker rm $CONTAINER_NAME
+fi
+
+docker run -d --name ${container_svr_name} --restart=always \
+           -v {{DEFAULT_WORKSPACE}}/docker/paas-web.conf:/etc/nginx/conf.d/paas-web.conf \
+           -p 9001:9001 deploy.bocloud/paas/${base_name}:{{RELEASE_TAGS}}
+
+sleep 5
+
+svr_runing=$(docker ps -a | grep "${container_svr_name}" | egrep "Up [About]|[0-9]{1,}")
+if [[ ${svr_runing} == "" ]];
+then
+    echo -e "\nError: paas-web failed to start...\n"
+    exit 1
+fi

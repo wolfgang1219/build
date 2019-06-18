@@ -1,0 +1,74 @@
+#!/bin/bash
+####################################################
+##
+## Copyright (2018, ) Bocloud. Co., Lmt.
+##
+## Author: chenye@beyondcent.com ; gemini_chen@163.com
+## Date  : 2018/06/28
+##
+#####################################################
+
+WORKSPACE=$1
+
+. $WORKSPACE/bin/tool
+. $WORKSPACE/bin/logs
+
+
+SQL_PATH=$WORKSPACE/sql/
+
+DB_List="nacha_auth nacha_deployer nacha_pipeline nacha_runtime nacha_appstore"
+
+
+######################
+#crate database
+function sql_inject_into_db
+{
+    for DATABASE in $DB_List
+    do 
+        #mysql -u${SQL_USER} -p'${SQL_PASS}'  << EOF 2> /dev/null
+        mysql -uroot -p"${SQL_PASS}" -h 127.0.0.1 -P${SQL_PORT} << EOF 2> /dev/null
+        DROP DATABASE IF EXISTS $DATABASE;
+        CREATE DATABASE $DATABASE; 
+EOF
+        [ $? -eq 0 ] && echo "created DB $DATABASE" || echo "DB $DATABASE already exists"
+    
+    done 
+    
+    #init sql 
+    for DATABASE in $DB_List
+    do
+     
+         file=$(ls $SQL_PATH | grep ${DATABASE}-.*.sql)
+         sqlfile=${SQL_PATH}/${file}
+         sql=$(cat $sqlfile)
+         
+         #mysql -u${SQL_USER} -p'${SQL_PASS}' $DATABASE -e "${sql}"
+         mysql -uroot -p"${SQL_PASS}" -h 127.0.0.1  -D${DATABASE} -P${SQL_PORT} -e "${sql}"
+         #mysql -uroot -p'${SQL_PASS}' -h 127.0.0.1 -D$DATABASE -P${SQL_PORT} -e "source ${sqlfile}"
+         [ $? -eq 0 ] && echo "init file $sqlfile for $DATABASE success" || echo "init file $sqlfile for $DATABASE faile"
+         
+         sleep 3
+    
+    done 
+}
+
+function import_database_action
+{
+    _banner_index "Initial And Import SQL File Into Database"
+    x=1
+    while true
+    do
+        MYSQL_PING=$(/usr/bin/mysqladmin -u root -p"${SQL_PASS}" -P${SQL_PORT} -h 127.0.0.1 ping 2>/dev/null)
+        MYSQL_OK="mysqld is alive"
+        if [[ "$MYSQL_PING" == "$MYSQL_OK" ]]
+        then
+ 		break 
+	else
+		sleep 10
+	fi
+    done
+
+    sql_inject_into_db
+}
+#sql_inject_into_db
+import_database_action

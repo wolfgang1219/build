@@ -1,0 +1,6 @@
+- hosts: WORKER
+  become: true
+  roles:
+    - paas_worker
+  tags:
+    - paas_worker

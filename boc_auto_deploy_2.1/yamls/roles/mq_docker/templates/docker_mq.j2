@@ -1,0 +1,25 @@
+#!/bin/bash
+container_svr_name="mq_$(hostname -s)"
+
+CONTAINER_NAME=$(docker ps --all -f name=${container_svr_name} -q)
+if [ "$CONTAINER_NAME" != "" ];then
+    docker stop $CONTAINER_NAME
+    docker rm $CONTAINER_NAME
+fi
+
+docker run -d --hostname $(hostname -s) --restart=always --name ${container_svr_name} \
+           -e RABBITMQ_DEFAULT_USER={{MQ_USER}} -e RABBITMQ_DEFAULT_PASS={{MQ_PASS}} \
+           -e RABBITMQ_ERLANG_COOKIE='rabbitcookie' \
+           --net=host deploy.bocloud/paas/rabbitmq:3.6.15-management
+
+sleep 5
+
+svr_runing=$(docker ps -a | grep "${container_svr_name}" | egrep "Up [About]|[0-9]{1,}")
+if [[ ${svr_runing} == "" ]];
+then
+    echo -e "\nError: docker-rabbitmq failed to start...\n"
+    exit 1
+fi
+echo -e "\nOK: docker-rabbitmq has started as background server.\n"
+exit 0
+

@@ -1,0 +1,18 @@
+---
+- name: Ensure MariaDB is running
+  service:
+    name: mariadb
+    state: started
+
+- name: Pre-Check Mariadb Status
+  shell: mysql -h127.0.0.1 -P{{DB_PORT}} -uroot -p'{{ maridb_password }}' -e "select version();"
+  register: mysql_install_status
+  ignore_errors: true
+
+- name: Add Galera SST user
+  mysql_user:
+    name: "{{ galera_sst_user }}"
+    host: "localhost"
+    password: '{{ galera_sst_pass }}'
+    priv: "*.*:RELOAD,LOCK TABLES,REPLICATION CLIENT"
+  when: mysql_install_status.rc
