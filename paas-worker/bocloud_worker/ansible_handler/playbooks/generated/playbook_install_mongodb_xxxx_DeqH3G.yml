@@ -1,0 +1,45 @@
+---
+
+- name: prepare installation
+  hosts: ['192.168.2.156']
+  vars:
+    yum_baseurl: "http://192.168.2.99/base_url/"
+    backup_repo: True
+    restory_repo: False
+  roles:
+    - role: bocloud_common
+
+- name: install mongoDB
+  hosts: ['192.168.2.156']
+  vars:
+    mongodb_version: "3.6"
+    yum_baseurl: "http://192.168.2.99/base_url/"
+    mongodb_replication_replindexprefetch: all
+    mongodb_users: [{'password': 'passw0rd', 'name': 'testUser', 'roles': 'readWrite', 'database': 'admin'}]
+    mongodb_user_admin_password: passw0rd
+    mongodb_user_admin_name: siteUserAdmin
+    mongodb_storage_dbpath: /data/db
+    mongodb_security_authorization: disabled
+    mongodb_storage_journal_enabled: True
+    mongodb_replication_replset: repltest
+    mongodb_login_host: 192.168.2.97
+    mongodb_root_backup_password: passw0rd
+    mongodb_net_port: 27017
+    mongodb_storage_engine: wiredTiger
+    mongodb_root_admin_password: passw0rd
+    mongodb_storage_prealloc: True
+    mongodb_net_bindip: 0.0.0.0
+    mongodb_root_admin_name: siteRootAdmin
+    mongodb_root_backup_name: backupuser
+    mongodb_net_maxconns: 65536
+  roles:
+    - role: ansible-role-mongodb
+
+- name: restory original environment
+  hosts: ['192.168.2.156']
+  vars:
+    backup_repo: False
+    restory_repo: True
+    configure_bocloud_repo: False
+  roles:
+    - role: bocloud_common

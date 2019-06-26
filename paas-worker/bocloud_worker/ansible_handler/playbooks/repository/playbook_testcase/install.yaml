@@ -1,0 +1,10 @@
+- hosts: all
+  become: true
+  tasks:
+  - name: echo status variable in vars yaml file
+    shell: echo {{status}} > /tmp/yy
+    
+- hosts: webserver
+  become: true
+  roles:
+    - httpd    

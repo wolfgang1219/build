@@ -1,0 +1,118 @@
+#!/bin/bash
+
+##########################################
+# Description: This is bocloud_worker service
+# chkconfig: 2345 10 90
+##########################################
+
+
+#
+# Source function library.
+#
+if [ -f /etc/rc.d/init.d/functions ]; then
+    . /etc/rc.d/init.d/functions
+fi
+
+BOCLOUD_WORKER_ROOT="/opt/worker/bocloud_worker"
+
+# bocloud_worker.py path
+BOCLOUD_WORKER_MAIN="${BOCLOUD_WORKER_ROOT}/bocloud_worker.py"
+
+prog="bocloud_worker"
+lockfile="/var/lock/subsys/bocloud_worker"
+pidfile="/var/run/bocloud_worker.pid"
+logfile=$(grep file /opt/worker/bocloud_worker/bocloud_worker_config.yml 2>/dev/null |awk -F ': ' '{print $2}')
+logfile=${logfile:-/var/log/bocloud/bocloud_worker.log}
+logfile=${logfile//\'/}
+
+BOCLOUD_WORKER_NAME=${BOCLOUD_WORKER_MAIN##*/}
+
+start() {
+    echo -n "Starting $prog"
+    RETVAL=0
+
+    if [ ! -f $BOCLOUD_WORKER_MAIN ]; then 
+        echo "Error: BOCLOUD worker wasn't installed"
+        RETVAL=1
+        echo
+        return $RETVAL
+    fi
+
+    if [ -f $lockfile ]; then
+        echo -n "Error: BOCLOUD worker already running"
+        RETVAL=1
+        echo
+        return $RETVAL
+    fi
+
+    if [ -f $pidfile ]; then
+        PID=`cat $pidfile`
+        echo -n "Error: BOCLOUD worker already running: pid=$PID"
+        RETVAL=1
+        echo
+        return $RETVAL
+    fi
+
+    if [ $RETVAL -eq 0 ]; then
+        if [ ! -f $logfile ] ;then
+            mkdir -p $(dirname ${logfile})
+            touch ${logfile}
+        fi
+        cd ${BOCLOUD_WORKER_ROOT}; nohup python ${BOCLOUD_WORKER_NAME} &> $logfile &
+        RETVAL=$?
+        [ $RETVAL = 0 ] && touch $lockfile || RETVAL=1
+        echo
+        return $RETVAL
+    fi
+    echo
+}
+
+stop() {
+    echo -n "Stopping $prog"
+    if [ -f "${pidfile}" ]; then
+        # stop it here, often "killproc $prog"
+        killproc -p $pidfile -d 20000 $prog
+        retval=$?
+        echo
+        [ $retval -eq 0 ] && rm -f $lockfile
+        return $retval
+    fi
+    echo
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        num=$(ps -fe|grep "python bocloud_worker.py"|grep -v grep|wc -l)
+        if [ -f "${pidfile}" ] && [ $num -gt 0 ]; then
+            [ $num -ne 1 ] && echo -e "WARNING:\n  Bocloud_worker daemon number is $num" \
+              && echo "  If no task running, bocloud_worker status is abnormal, please restart."
+            RETVAL=0
+            echo -n "bocloud_worker          running"
+        else
+            [ $num -gt 0 ] && echo -e "WARNING:\n  Bocloud_worker daemon still exists"
+            RETVAL=0
+            echo -n "bocloud_worker          disable"
+        fi
+        echo
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    condrestart)
+        if [ -f $lockfile ]; then
+            stop
+            start
+        fi
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        ;;
+esac
+exit $RETVAL

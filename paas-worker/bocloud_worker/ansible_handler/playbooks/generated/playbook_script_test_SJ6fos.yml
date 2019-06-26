@@ -1,0 +1,11 @@
+
+---
+
+- hosts: []
+
+  tasks:
+    - name: operate  script by ansible script module
+      script: 
+      
+    
+      register: bocloud_script_msg

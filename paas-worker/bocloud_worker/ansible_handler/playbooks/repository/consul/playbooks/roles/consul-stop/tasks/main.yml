@@ -1,0 +1,4 @@
+- name: stop consul
+  service: name=consul state=stopped
+
+

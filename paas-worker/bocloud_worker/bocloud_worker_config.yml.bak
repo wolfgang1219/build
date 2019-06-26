@@ -1,0 +1,43 @@
+---
+bocloud_worker:
+  host: '192.168.2.192'
+  port: 18089
+  flask_debug: true
+  nfs_path: '/tmp'
+  init_sql: '/opt/worker/bocloud_worker/common/db/bocloud_worker_db.sql'
+  job_timeout: 600
+  external_mq:
+    exchange: 'bocloud.direct.exchange'
+    type: 'direct'
+  log:
+    file: '/var/log/bocloud/bocloud_worker.log'
+    level: 'Debug'
+  # example 192.168.10.1-15,192.168.20.*;192.168.100.*:192.168.30.1
+  whitelist: ''
+  blacklist: ''
+bocloud_ansible:
+  playbook_template: '/opt/worker/bocloud_worker/ansible_handler/playbooks/template/'
+  playbook_folder: '/opt/worker/bocloud_worker/ansible_handler/playbooks/generated/'
+  playbook_repository: '/opt/worker/bocloud_worker/ansible_handler/playbooks/repository/'
+  playbook_roles: '/opt/worker/bocloud_worker/ansible_handler/roles'
+  packages_path: '/root/ansible/packages'
+  packages_yum_baseurl: 'http://192.168.2.99/base_url/'
+  inventory_genpath: '/tmp'
+  forks: 100
+rabbitmq:
+  - host: '192.168.2.171'
+    port: 5672
+    user: 'bocloud'
+    password: 'a@!#123'
+    vhost: '/'
+consul:
+  enable: true
+  consul_server: '192.168.2.215'
+  consul_port: 8500
+  check_interval: '30s'
+  master_token: '987bd467-a93e-8558-1aaf-f7c4036c406b'
+zookeeper:
+  enable: False
+  zk_server: '192.168.2.215:2181'
+  user: 'bocloud'
+  password: 'CoU6oY/zuAoBbu6cdgOKlA=='

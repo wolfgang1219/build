@@ -1,0 +1,4 @@
+---
+- name: install initializtion require software
+  yum: name=httpd state=latest
+  

@@ -1,0 +1,6 @@
+- hosts: consulserver
+  remote_user: root
+  become: true
+
+  roles:
+    - consul-uninstall

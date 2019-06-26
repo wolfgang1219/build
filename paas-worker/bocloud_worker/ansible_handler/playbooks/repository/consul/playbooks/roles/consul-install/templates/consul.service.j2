@@ -1,0 +1,12 @@
+[Unit]
+Description=Consul server
+After=syslog.target network.target
+
+[Service]
+EnvironmentFile=/etc/consul/config.json
+ExecStart=/usr/bin/consul agent -config-file=/etc/consul/config.json
+ExecReload=/bin/kill -USR2 $MAINPID
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

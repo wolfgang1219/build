@@ -1,0 +1,5 @@
+- name: start consul server
+  service: name=consul state=started 
+
+
+

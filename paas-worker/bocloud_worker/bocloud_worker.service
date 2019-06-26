@@ -1,0 +1,15 @@
+[Unit]
+Description=Bocloud Worker
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/bocloud_worker.pid
+ExecStart=/etc/init.d/bocloud_worker start
+ExecReload=/etc/init.d/bocloud_worker restart
+ExecReStart=/etc/init.d/bocloud_worker restart
+ExecStop=/etc/init.d/bocloud_worker stop 
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

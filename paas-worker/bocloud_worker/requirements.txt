@@ -1,0 +1,10 @@
+Flask
+flask_restful
+pika==0.10.0
+kazoo
+pywinrm
+pyghmi
+pysnmp
+requests
+passlib>=1.7.1
+pycrypto

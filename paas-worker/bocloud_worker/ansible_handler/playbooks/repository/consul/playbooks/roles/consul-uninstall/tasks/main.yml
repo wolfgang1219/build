@@ -1,0 +1,15 @@
+# before uninstall service , stop consul service 
+- name:  stop consul 
+  service: name=consul state=stopped
+
+- name: remove consul unit fie
+  file: path=/usr/lib/systemd/system/consul.service state=absent
+
+- name: remove the config file
+  file: path=/etc/consul/config.json state=absent
+
+- name:  remove the consul binary file
+  file: path=/usr/bin/consul state=absent
+
+
+ 

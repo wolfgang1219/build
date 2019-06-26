@@ -1,0 +1,14 @@
+- name: Download consul
+  get_url: url={{consuldownloadurl}} dest=/usr/bin/consul mode=777
+
+#- name: add executor pri to consul
+- name: mdkir /etc/consul
+  file: path=/etc/consul state=directory
+
+- name: add config file to consul 
+  template: src=config.json.j2  dest=/etc/consul/config.json
+
+- name: add consul systemd unit file
+  template: src=consul.service.j2  dest=/usr/lib/systemd/system/consul.service
+
+

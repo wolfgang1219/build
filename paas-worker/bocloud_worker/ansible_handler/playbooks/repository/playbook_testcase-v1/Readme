@@ -1,0 +1,5 @@
+ansible-playbook -i invertory -e @vars/vars.yaml playbooks/install.yaml 
+ansible-playbook -i invertory -e @vars/vars.yaml playbooks/start.yaml 
+ansible-playbook -i invertory -e @vars/vars.yaml playbooks/restart.yaml 
+ansible-playbook -i invertory -e @vars/vars.yaml playbooks/stop.yaml 
+ansible-playbook -i invertory -e @vars/vars.yaml playbooks/uninstall.yaml 

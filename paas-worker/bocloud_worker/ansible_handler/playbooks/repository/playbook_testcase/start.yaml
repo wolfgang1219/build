@@ -1,0 +1,5 @@
+- hosts: webserver
+  become: true
+  tasks:
+   - name: start httpd
+    service: name=httpd state=started

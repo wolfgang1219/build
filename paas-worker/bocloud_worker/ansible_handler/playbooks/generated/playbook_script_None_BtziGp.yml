@@ -1,0 +1,11 @@
+
+---
+
+- hosts: ['192.168.2.171']
+
+  tasks:
+    - name: operate shell script by ansible script module
+      script: /tmp/ansible_script_None a a a a
+      
+    
+      register: bocloud_script_msg
